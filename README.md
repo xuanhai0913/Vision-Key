@@ -22,12 +22,12 @@
 
 | Tính năng | Mô tả |
 |-----------|-------|
-| ��️ **Menu Bar App** | Chạy trên thanh menu, không chiếm dock |
+|  **Menu Bar App** | Chạy trên thanh menu, không chiếm dock |
 | 📸 **Chụp màn hình** | Kéo chọn vùng bất kỳ trên màn hình |
 | 🤖 **AI Gemini 2.5 Pro** | Phân tích ảnh với model AI mạnh nhất |
 | ⌨️ **Phím tắt toàn cục** | \`⌘ + ⇧ + .\` để chụp từ bất kỳ đâu |
 | 🎯 **2 chế độ trả lời** | Trắc nghiệm (chỉ đáp án) & Tự luận (giải thích chi tiết) |
-| ��‍🏫 **Vai trò chuyên gia** | Nhập lĩnh vực để AI trả lời chính xác hơn |
+|  **Vai trò chuyên gia** | Nhập lĩnh vực để AI trả lời chính xác hơn |
 | 🇻🇳 **Tiếng Việt** | 100% hỗ trợ tiếng Việt |
 | 🔒 **Bảo mật** | API key lưu trong macOS Keychain |
 
@@ -59,27 +59,27 @@ Khi chạy lần đầu, cho phép **Screen Recording** tại:
 
 ## 📖 Sử dụng
 
-### 1️⃣ Cài đặt API Key
+### 1. Cài đặt API Key
 
 1. Click icon 👁 trên menu bar
 2. Vào Settings (⚙️)
 3. Dán Gemini API Key
 4. Click "Save"
 
-### 2️⃣ Chụp màn hình
+### 2. Chụp màn hình
 
 **Cách 1:** Nhấn \`⌘ + ⇧ + .\` → Kéo chọn vùng → Thả
 
 **Cách 2:** Click icon → "Capture Screen" → Kéo chọn
 
-### 3️⃣ Chọn chế độ
+### 3. Chọn chế độ
 
 | Chế độ | Khi nào dùng |
 |--------|--------------|
 | **Trắc nghiệm** | Cần đáp án nhanh (A, B, C, D hoặc số) |
 | **Tự luận** | Cần giải thích chi tiết từng bước |
 
-### 4️⃣ Nhập vai chuyên gia (tùy chọn)
+### 4. Nhập vai chuyên gia (tùy chọn)
 
 Nhập lĩnh vực để AI trả lời chính xác hơn:
 - \`Toán học\` - cho bài toán
@@ -91,7 +91,7 @@ Nhập lĩnh vực để AI trả lời chính xác hơn:
 
 ### Cấu trúc Project
 
-\`\`\`
+```
 GeminiSnap/
 ├── GeminiSnapApp.swift      # Entry point
 ├── ContentView.swift        # Main UI
@@ -102,7 +102,7 @@ GeminiSnap/
 ├── KeychainHelper.swift     # Lưu API key an toàn
 ├── SettingsView.swift       # Cài đặt
 └── ResultView.swift         # Hiển thị kết quả
-\`\`\`
+```
 
 ### Công nghệ sử dụng
 
@@ -117,9 +117,9 @@ GeminiSnap/
 
 ### API Endpoint
 
-\`\`\`
+```
 POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent
-\`\`\`
+```
 
 ## ❓ Xử lý lỗi
 

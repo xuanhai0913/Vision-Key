@@ -46,25 +46,40 @@ enum AnswerMode: String, CaseIterable {
         }
     }
     
-    var prompt: String {
+    func buildPrompt(expertContext: String?) -> String {
+        let expertLine = if let expert = expertContext, !expert.isEmpty {
+            "Bạn là chuyên gia \(expert). "
+        } else {
+            ""
+        }
+        
         switch self {
         case .tracNghiem:
             return """
-            Trả lời bằng tiếng Việt. CHỈ đưa ra đáp án, KHÔNG giải thích.
+            \(expertLine)Trả lời bằng tiếng Việt.
             
-            - Bài toán: chỉ ghi đáp số (ví dụ: "42" hoặc "x = 5")
-            - Trắc nghiệm: chỉ ghi đáp án (ví dụ: "A" hoặc "C")
-            - Code: chỉ viết code sửa lỗi, không comment
-            - Câu hỏi: trả lời 1-2 từ nếu có thể
+            Bạn có thể giải thích ngắn gọn nếu cần, nhưng LUÔN LUÔN kết thúc bằng:
+            
+            FINAL_ANSWER: [đáp án cuối cùng]
+            
+            Ví dụ:
+            - Bài toán: FINAL_ANSWER: 42
+            - Trắc nghiệm: FINAL_ANSWER: C
+            - Code: FINAL_ANSWER: ```code đã sửa```
+            - Câu hỏi: FINAL_ANSWER: [câu trả lời ngắn]
             """
         case .tuLuan:
             return """
-            Trả lời bằng tiếng Việt. Giải thích RÕ RÀNG và CHI TIẾT.
+            \(expertLine)Trả lời bằng tiếng Việt. Giải thích RÕ RÀNG và CHI TIẾT.
             
-            - Bài toán: giải từng bước
+            - Bài toán: giải từng bước, giải thích công thức
             - Code: giải thích lỗi, tại sao sai, cách sửa
             - Câu hỏi: trả lời đầy đủ với ví dụ nếu cần
             - Văn bản: phân tích và tóm tắt ý chính
+            
+            Cuối cùng, LUÔN LUÔN tóm tắt bằng:
+            
+            FINAL_ANSWER: [kết luận/đáp án cuối cùng]
             """
         }
     }
@@ -78,7 +93,7 @@ class APIService {
     
     private init() {}
     
-    func analyzeImage(_ image: NSImage, apiKey: String, mode: AnswerMode = .tracNghiem, completion: @escaping (Result<String, APIError>) -> Void) {
+    func analyzeImage(_ image: NSImage, apiKey: String, mode: AnswerMode = .tracNghiem, expertContext: String? = nil, completion: @escaping (Result<String, APIError>) -> Void) {
         // Convert image to base64
         guard let imageData = imageToBase64(image) else {
             completion(.failure(.invalidImage))
@@ -91,8 +106,9 @@ class APIService {
             return
         }
         
-        // Build request body with mode-specific prompt
-        let requestBody = buildRequestBody(imageBase64: imageData, prompt: mode.prompt)
+        // Build request body with mode-specific prompt and expert context
+        let prompt = mode.buildPrompt(expertContext: expertContext)
+        let requestBody = buildRequestBody(imageBase64: imageData, prompt: prompt)
         
         // Create request
         var request = URLRequest(url: url)
@@ -176,8 +192,8 @@ class APIService {
                 ]
             ],
             "generationConfig": [
-                "temperature": 0.4,
-                "topK": 32,
+                "temperature": 0.0,  // Deterministic output for accuracy
+                "topK": 1,
                 "topP": 1,
                 "maxOutputTokens": 4096
             ]

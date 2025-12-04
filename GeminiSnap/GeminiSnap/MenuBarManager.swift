@@ -19,6 +19,7 @@ class MenuBarManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var showSettings = false
     @Published var answerMode: AnswerMode = .tracNghiem  // Chế độ trả lời
+    @Published var expertContext: String = ""  // Vai trò chuyên gia (VD: "Toán học", "Lập trình Python")
     
     init() {
         setupStatusItem()
@@ -125,7 +126,7 @@ class MenuBarManager: ObservableObject {
         errorMessage = nil
         resultText = nil
         
-        APIService.shared.analyzeImage(image, apiKey: apiKey, mode: answerMode) { [weak self] result in
+        APIService.shared.analyzeImage(image, apiKey: apiKey, mode: answerMode, expertContext: expertContext.isEmpty ? nil : expertContext) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoading = false
                 

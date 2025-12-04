@@ -117,6 +117,9 @@ struct ContentView: View {
             
             // Answer Mode Toggle
             answerModeToggle
+            
+            // Expert Context Input
+            expertContextInput
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -158,6 +161,25 @@ struct ContentView: View {
         }
         .background(Color.secondary.opacity(0.15))
         .cornerRadius(8)
+    }
+    
+    // MARK: - Expert Context Input
+    
+    private var expertContextInput: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "person.fill.questionmark")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            TextField("Chuyên gia gì? (VD: Toán, Python, Hóa học...)", text: $menuBarManager.expertContext)
+                .textFieldStyle(.plain)
+                .font(.caption)
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(6)
     }
     
     // MARK: - API Key Status

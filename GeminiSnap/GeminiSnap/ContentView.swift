@@ -79,39 +79,40 @@ struct ContentView: View {
                     Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
                             .font(.body)
-                        .foregroundColor(.secondary)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings")
+                    
+                    // Menu
+                    Menu {
+                        Button(action: { menuBarManager.triggerScreenCapture() }) {
+                            Label("Capture Screen", systemImage: "camera.viewfinder")
+                        }
+                        .keyboardShortcut(".", modifiers: [.command, .shift])
+                        
+                        Divider()
+                        
+                        Button(action: { showSettings = true }) {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                        .keyboardShortcut(",", modifiers: .command)
+                        
+                        Divider()
+                        
+                        Button(action: { menuBarManager.quit() }) {
+                            Label("Quit GeminiSnap", systemImage: "power")
+                        }
+                        .keyboardShortcut("q", modifiers: .command)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
                 }
-                .buttonStyle(.plain)
-                .help("Settings")
-                
-                // Menu
-                Menu {
-                    Button(action: { menuBarManager.triggerScreenCapture() }) {
-                        Label("Capture Screen", systemImage: "camera.viewfinder")
-                    }
-                    .keyboardShortcut(".", modifiers: [.command, .shift])
-                    
-                    Divider()
-                    
-                    Button(action: { showSettings = true }) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    .keyboardShortcut(",", modifiers: .command)
-                    
-                    Divider()
-                    
-                    Button(action: { menuBarManager.quit() }) {
-                        Label("Quit GeminiSnap", systemImage: "power")
-                    }
-                    .keyboardShortcut("q", modifiers: .command)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
             }
             
             // Answer Mode Toggle

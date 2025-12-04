@@ -1,8 +1,9 @@
 //
 //  MenuBarManager.swift
-//  GeminiSnap
+//  Vision Key
 //
-//  Handles the status bar icon and popover display
+//  Copyright © 2025 Nguyễn Xuân Hải (xuanhai0913)
+//  GitHub: https://github.com/xuanhai0913
 //
 
 import SwiftUI
@@ -132,11 +133,78 @@ class MenuBarManager: ObservableObject {
                 
                 switch result {
                 case .success(let text):
-                    self?.resultText = text
+                    // Lọc chỉ lấy FINAL_ANSWER nếu ở chế độ Trắc nghiệm
+                    if self?.answerMode == .tracNghiem {
+                        self?.resultText = self?.extractFinalAnswer(from: text) ?? text
+                    } else {
+                        self?.resultText = text
+                    }
                 case .failure(let error):
                     self?.errorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+    
+    /// Lọc tất cả FINAL_ANSWER: từ response (hỗ trợ nhiều câu hỏi)
+    private func extractFinalAnswer(from text: String) -> String? {
+        var answers: [String] = []
+        let lines = text.components(separatedBy: "\n")
+        
+        var i = 0
+        while i < lines.count {
+            let line = lines[i]
+            
+            // Kiểm tra xem dòng có chứa FINAL_ANSWER: không
+            if let range = line.range(of: "FINAL_ANSWER:", options: .caseInsensitive) {
+                var answer = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                
+                // Nếu đáp án nằm trên nhiều dòng (VD: code block), lấy tiếp
+                i += 1
+                while i < lines.count {
+                    let nextLine = lines[i]
+                    // Dừng khi gặp FINAL_ANSWER tiếp theo hoặc dòng trống đôi
+                    if nextLine.range(of: "FINAL_ANSWER:", options: .caseInsensitive) != nil {
+                        i -= 1  // Quay lại để vòng ngoài xử lý
+                        break
+                    }
+                    // Dừng khi gặp câu hỏi mới (Câu 1, Câu 2, **Câu, etc.)
+                    if nextLine.range(of: "^\\s*(Câu|\\*\\*Câu|\\d+[\\.\\)])", options: .regularExpression) != nil {
+                        i -= 1
+                        break
+                    }
+                    // Thêm dòng vào đáp án
+                    if !nextLine.trimmingCharacters(in: .whitespaces).isEmpty {
+                        answer += "\n" + nextLine
+                    } else if answer.contains("```") {
+                        // Trong code block, giữ dòng trống
+                        answer += "\n"
+                    } else {
+                        // Dòng trống = kết thúc đáp án
+                        break
+                    }
+                    i += 1
+                }
+                
+                let trimmedAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedAnswer.isEmpty {
+                    answers.append(trimmedAnswer)
+                }
+            }
+            i += 1
+        }
+        
+        if answers.isEmpty {
+            return nil
+        }
+        
+        // Format output: đánh số nếu có nhiều đáp án
+        if answers.count == 1 {
+            return answers[0]
+        } else {
+            return answers.enumerated().map { index, answer in
+                "**Câu \(index + 1):** \(answer)"
+            }.joined(separator: "\n\n")
         }
     }
     

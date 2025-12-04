@@ -1,8 +1,9 @@
 //
 //  ContentView.swift
-//  GeminiSnap
+//  Vision Key
 //
-//  Main content view displayed in the popover
+//  Copyright © 2025 Nguyễn Xuân Hải (xuanhai0913)
+//  GitHub: https://github.com/xuanhai0913
 //
 
 import SwiftUI
@@ -60,9 +61,9 @@ struct ContentView: View {
                         )
                     
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("GeminiSnap")
+                        Text("Vision Key")
                             .font(.headline)
-                        Text("AI Screen Assistant")
+                        Text("by xuanhai0913")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }

@@ -1,8 +1,11 @@
 //
 //  GeminiSnapApp.swift
-//  GeminiSnap
+//  Vision Key
 //
-//  AI Screen Assistant - Menu Bar Application
+//  AI Screen Assistant - Capture & Analyze with Gemini
+//
+//  Copyright © 2025 Nguyễn Xuân Hải (xuanhai0913)
+//  GitHub: https://github.com/xuanhai0913
 //
 
 import SwiftUI

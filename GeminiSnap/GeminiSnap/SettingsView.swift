@@ -1,8 +1,9 @@
 //
 //  SettingsView.swift
-//  GeminiSnap
+//  Vision Key
 //
-//  Settings UI for API key configuration
+//  Copyright © 2025 Nguyễn Xuân Hải (xuanhai0913)
+//  GitHub: https://github.com/xuanhai0913
 //
 
 import SwiftUI
@@ -95,6 +96,21 @@ struct SettingsView: View {
             .background(Color.secondary.opacity(0.1))
             .cornerRadius(8)
             
+            // About / Copyright
+            VStack(spacing: 4) {
+                Text("Vision Key v1.0")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                HStack(spacing: 4) {
+                    Text("© 2025")
+                    Link("Nguyễn Xuân Hải (xuanhai0913)", destination: URL(string: "https://github.com/xuanhai0913")!)
+                }
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            
             // Buttons
             HStack {
                 Button("Delete Key") {
@@ -117,7 +133,7 @@ struct SettingsView: View {
             }
         }
         .padding(20)
-        .frame(width: 380, height: 360)
+        .frame(width: 380, height: 420)
         .onAppear {
             loadCurrentKey()
         }

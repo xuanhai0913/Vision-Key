@@ -1,8 +1,9 @@
 //
 //  APIService.swift
-//  GeminiSnap
+//  Vision Key
 //
-//  Handles Gemini API calls via REST
+//  Copyright © 2025 Nguyễn Xuân Hải (xuanhai0913)
+//  GitHub: https://github.com/xuanhai0913
 //
 
 import Foundation

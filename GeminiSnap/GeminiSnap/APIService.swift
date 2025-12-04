@@ -34,24 +34,51 @@ enum APIError: LocalizedError {
     }
 }
 
+// Chế độ trả lời
+enum AnswerMode: String, CaseIterable {
+    case tracNghiem = "Trắc nghiệm"
+    case tuLuan = "Tự luận"
+    
+    var icon: String {
+        switch self {
+        case .tracNghiem: return "checkmark.circle.fill"
+        case .tuLuan: return "text.alignleft"
+        }
+    }
+    
+    var prompt: String {
+        switch self {
+        case .tracNghiem:
+            return """
+            Trả lời bằng tiếng Việt. CHỈ đưa ra đáp án, KHÔNG giải thích.
+            
+            - Bài toán: chỉ ghi đáp số (ví dụ: "42" hoặc "x = 5")
+            - Trắc nghiệm: chỉ ghi đáp án (ví dụ: "A" hoặc "C")
+            - Code: chỉ viết code sửa lỗi, không comment
+            - Câu hỏi: trả lời 1-2 từ nếu có thể
+            """
+        case .tuLuan:
+            return """
+            Trả lời bằng tiếng Việt. Giải thích RÕ RÀNG và CHI TIẾT.
+            
+            - Bài toán: giải từng bước, giải thích công thức
+            - Code: giải thích lỗi, tại sao sai, cách sửa
+            - Câu hỏi: trả lời đầy đủ với ví dụ nếu cần
+            - Văn bản: phân tích và tóm tắt ý chính
+            """
+        }
+    }
+}
+
 class APIService {
     static let shared = APIService()
     
     // Gemini 2.5 Pro - model mới nhất và mạnh nhất (June 2025)
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
     
-    private let defaultPrompt = """
-    Trả lời bằng tiếng Việt. Chỉ đưa ra đáp án trực tiếp, không giải thích dài dòng.
-    
-    - Nếu là bài toán: chỉ ghi đáp số
-    - Nếu là code: chỉ sửa lỗi hoặc viết code đúng
-    - Nếu là câu hỏi: trả lời ngắn gọn nhất có thể
-    - Nếu là văn bản: tóm tắt ý chính
-    """
-    
     private init() {}
     
-    func analyzeImage(_ image: NSImage, apiKey: String, prompt: String? = nil, completion: @escaping (Result<String, APIError>) -> Void) {
+    func analyzeImage(_ image: NSImage, apiKey: String, mode: AnswerMode = .tracNghiem, completion: @escaping (Result<String, APIError>) -> Void) {
         // Convert image to base64
         guard let imageData = imageToBase64(image) else {
             completion(.failure(.invalidImage))
@@ -64,8 +91,8 @@ class APIService {
             return
         }
         
-        // Build request body
-        let requestBody = buildRequestBody(imageBase64: imageData, prompt: prompt ?? defaultPrompt)
+        // Build request body with mode-specific prompt
+        let requestBody = buildRequestBody(imageBase64: imageData, prompt: mode.prompt)
         
         // Create request
         var request = URLRequest(url: url)

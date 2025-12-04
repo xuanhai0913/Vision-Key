@@ -18,6 +18,7 @@ class MenuBarManager: ObservableObject {
     @Published var resultText: String?
     @Published var errorMessage: String?
     @Published var showSettings = false
+    @Published var answerMode: AnswerMode = .tracNghiem  // Chế độ trả lời
     
     init() {
         setupStatusItem()
@@ -124,7 +125,7 @@ class MenuBarManager: ObservableObject {
         errorMessage = nil
         resultText = nil
         
-        APIService.shared.analyzeImage(image, apiKey: apiKey) { [weak self] result in
+        APIService.shared.analyzeImage(image, apiKey: apiKey, mode: answerMode) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isLoading = false
                 
@@ -139,6 +140,10 @@ class MenuBarManager: ObservableObject {
     }
     
     // MARK: - Actions
+    
+    func toggleAnswerMode() {
+        answerMode = answerMode == .tracNghiem ? .tuLuan : .tracNghiem
+    }
     
     func openSettings() {
         showSettings = true

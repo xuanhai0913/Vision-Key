@@ -45,39 +45,40 @@ struct ContentView: View {
     // MARK: - Header
     
     private var headerView: some View {
-        HStack {
-            // App icon and title
-            HStack(spacing: 8) {
-                Image(systemName: "eye.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+        VStack(spacing: 8) {
+            HStack {
+                // App icon and title
+                HStack(spacing: 8) {
+                    Image(systemName: "eye.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("GeminiSnap")
-                        .font(.headline)
-                    Text("AI Screen Assistant")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("GeminiSnap")
+                            .font(.headline)
+                        Text("AI Screen Assistant")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
-            }
-            
-            Spacer()
-            
-            // Action buttons
-            HStack(spacing: 8) {
-                // API Key status indicator
-                apiKeyStatusIndicator
                 
-                // Settings button
-                Button(action: { showSettings = true }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.body)
+                Spacer()
+                
+                // Action buttons
+                HStack(spacing: 8) {
+                    // API Key status indicator
+                    apiKeyStatusIndicator
+                    
+                    // Settings button
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.body)
                         .foregroundColor(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -112,10 +113,50 @@ struct ContentView: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
             }
+            
+            // Answer Mode Toggle
+            answerModeToggle
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.secondary.opacity(0.05))
+    }
+    
+    // MARK: - Answer Mode Toggle
+    
+    private var answerModeToggle: some View {
+        HStack(spacing: 0) {
+            ForEach(AnswerMode.allCases, id: \.self) { mode in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        menuBarManager.answerMode = mode
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: mode.icon)
+                            .font(.caption)
+                        Text(mode.rawValue)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        menuBarManager.answerMode == mode
+                            ? Color.accentColor
+                            : Color.clear
+                    )
+                    .foregroundColor(
+                        menuBarManager.answerMode == mode
+                            ? .white
+                            : .secondary
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(Color.secondary.opacity(0.15))
+        .cornerRadius(8)
     }
     
     // MARK: - API Key Status

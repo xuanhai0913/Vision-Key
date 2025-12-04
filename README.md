@@ -1,173 +1,154 @@
-# GeminiSnap - AI Screen Assistant
+# Vision Key - AI Screen Assistant
 
-A native macOS menu bar application that captures screen regions and analyzes them using Google's Gemini AI.
+<div align="center">
 
-![macOS](https://img.shields.io/badge/macOS-13.0+-blue)
-![Swift](https://img.shields.io/badge/Swift-5.9+-orange)
-![SwiftUI](https://img.shields.io/badge/SwiftUI-✓-green)
+![Vision Key Logo](https://img.shields.io/badge/Vision_Key-AI_Screen_Assistant-purple?style=for-the-badge&logo=apple)
 
-## Features
+[![macOS](https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5.9+-orange?style=flat-square&logo=swift)](https://swift.org/)
+[![SwiftUI](https://img.shields.io/badge/SwiftUI-✓-green?style=flat-square)](https://developer.apple.com/xcode/swiftui/)
+[![Gemini](https://img.shields.io/badge/Gemini_2.5_Pro-API-4285F4?style=flat-square&logo=google)](https://ai.google.dev/)
+[![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
-- 🖥️ **Menu Bar App** - Lives in the macOS status bar, no dock icon
-- 📸 **Screen Capture** - Drag to select any screen region
-- 🤖 **AI Analysis** - Uses Google Gemini 1.5 Flash to analyze images
-- ⌨️ **Global Hotkey** - Trigger capture with `Cmd + Shift + .`
-- 📝 **Markdown Rendering** - Beautifully formatted AI responses
-- 🔒 **Secure Storage** - API key stored in macOS Keychain
+**Ứng dụng menu bar macOS tích hợp AI Gemini để phân tích ảnh chụp màn hình**
 
-## Requirements
+[Tính năng](#-tính-năng) • [Cài đặt](#-cài-đặt) • [Sử dụng](#-sử-dụng) • [Phát triển](#-phát-triển)
 
-- macOS 13.0 or later
-- Xcode 15.0 or later
-- Google Gemini API Key ([Get one here](https://aistudio.google.com/app/apikey))
+</div>
 
-## Installation
+---
 
-### Build from Source
+## ✨ Tính năng
 
-1. **Clone the repository:**
-   ```bash
-   cd /Users/nguyenhai/Documents/GitHub/Vision-Key
-   ```
+| Tính năng | Mô tả |
+|-----------|-------|
+| ��️ **Menu Bar App** | Chạy trên thanh menu, không chiếm dock |
+| 📸 **Chụp màn hình** | Kéo chọn vùng bất kỳ trên màn hình |
+| 🤖 **AI Gemini 2.5 Pro** | Phân tích ảnh với model AI mạnh nhất |
+| ⌨️ **Phím tắt toàn cục** | \`⌘ + ⇧ + .\` để chụp từ bất kỳ đâu |
+| 🎯 **2 chế độ trả lời** | Trắc nghiệm (chỉ đáp án) & Tự luận (giải thích chi tiết) |
+| ��‍🏫 **Vai trò chuyên gia** | Nhập lĩnh vực để AI trả lời chính xác hơn |
+| 🇻🇳 **Tiếng Việt** | 100% hỗ trợ tiếng Việt |
+| 🔒 **Bảo mật** | API key lưu trong macOS Keychain |
 
-2. **Open in Xcode:**
-   ```bash
-   open GeminiSnap/GeminiSnap.xcodeproj
-   ```
+## 📋 Yêu cầu
 
-3. **Build and Run:**
-   - Press `Cmd + R` to build and run
-   - Or use `Product > Run` from the menu
+- macOS 13.0 trở lên
+- Xcode 15.0 trở lên
+- Google Gemini API Key ([Lấy tại đây](https://aistudio.google.com/app/apikey))
 
-4. **Grant Permissions:**
-   - On first launch, you'll be prompted for **Screen Recording** permission
-   - Go to `System Settings > Privacy & Security > Screen Recording` and enable GeminiSnap
+## 🚀 Cài đặt
 
-## Usage
+### Build từ Source
 
-### Setting Up Your API Key
+\`\`\`bash
+# Clone repository
+git clone https://github.com/xuanhai0913/Vision-Key.git
+cd Vision-Key
 
-1. Click the GeminiSnap icon (👁) in the menu bar
-2. Click the gear icon (⚙️) or the "No API Key" indicator
-3. Paste your Gemini API Key
+# Mở Xcode
+open GeminiSnap/GeminiSnap.xcodeproj
+
+# Build và Run (Cmd + R)
+\`\`\`
+
+### Cấp quyền
+
+Khi chạy lần đầu, cho phép **Screen Recording** tại:
+\`System Settings > Privacy & Security > Screen Recording\`
+
+## 📖 Sử dụng
+
+### 1️⃣ Cài đặt API Key
+
+1. Click icon 👁 trên menu bar
+2. Vào Settings (⚙️)
+3. Dán Gemini API Key
 4. Click "Save"
 
-### Capturing Screen
+### 2️⃣ Chụp màn hình
 
-**Method 1: Global Hotkey**
-- Press `Cmd + Shift + .` from anywhere
-- Drag to select a screen region
-- Release to capture
+**Cách 1:** Nhấn \`⌘ + ⇧ + .\` → Kéo chọn vùng → Thả
 
-**Method 2: Menu Bar**
-- Click the GeminiSnap icon
-- Click "Capture Screen" button
-- Drag to select a screen region
+**Cách 2:** Click icon → "Capture Screen" → Kéo chọn
 
-### Viewing Results
+### 3️⃣ Chọn chế độ
 
-- The AI response appears in the popover
-- Use the **Copy** button to copy the response
-- Click **New Capture** for another screenshot
-- Click **Clear** to reset
+| Chế độ | Khi nào dùng |
+|--------|--------------|
+| **Trắc nghiệm** | Cần đáp án nhanh (A, B, C, D hoặc số) |
+| **Tự luận** | Cần giải thích chi tiết từng bước |
 
-## Development
+### 4️⃣ Nhập vai chuyên gia (tùy chọn)
 
-### Setting API Key via Environment Variable
+Nhập lĩnh vực để AI trả lời chính xác hơn:
+- \`Toán học\` - cho bài toán
+- \`Python\` - cho code Python
+- \`Hóa học\` - cho bài Hóa
+- \`IELTS\` - cho tiếng Anh
 
-For development, you can set the API key in your Xcode scheme:
+## 🛠️ Phát triển
 
-1. Open `Product > Scheme > Edit Scheme...`
-2. Select `Run` > `Arguments`
-3. Add Environment Variable:
-   - Name: `GEMINI_API_KEY`
-   - Value: `your-api-key-here`
+### Cấu trúc Project
 
-### Project Structure
-
-```
+\`\`\`
 GeminiSnap/
-├── GeminiSnap.xcodeproj/
-├── GeminiSnap/
-│   ├── GeminiSnapApp.swift      # App entry point
-│   ├── ContentView.swift        # Main popover content
-│   ├── MenuBarManager.swift     # Status bar management
-│   ├── ScreenCaptureManager.swift # Screen capture logic
-│   ├── HotkeyManager.swift      # Global hotkey (Cmd+Shift+.)
-│   ├── APIService.swift         # Gemini REST API client
-│   ├── KeychainHelper.swift     # Secure API key storage
-│   ├── SettingsView.swift       # Settings UI
-│   ├── ResultView.swift         # AI response display
-│   ├── Assets.xcassets/         # App icons
-│   ├── Info.plist               # App configuration
-│   └── GeminiSnap.entitlements  # App capabilities
-└── README.md
-```
+├── GeminiSnapApp.swift      # Entry point
+├── ContentView.swift        # Main UI
+├── MenuBarManager.swift     # Status bar & logic
+├── ScreenCaptureManager.swift # Chụp màn hình
+├── HotkeyManager.swift      # Global hotkey (⌘⇧.)
+├── APIService.swift         # Gemini REST API
+├── KeychainHelper.swift     # Lưu API key an toàn
+├── SettingsView.swift       # Cài đặt
+└── ResultView.swift         # Hiển thị kết quả
+\`\`\`
 
-### Key Technologies
+### Công nghệ sử dụng
 
 | Component | Technology |
 |-----------|------------|
-| UI Framework | SwiftUI |
+| UI | SwiftUI |
 | Menu Bar | AppKit (NSStatusItem) |
-| Screen Capture | CoreGraphics (CGWindowListCreateImage) |
+| Screen Capture | macOS \`screencapture\` command |
 | Global Hotkey | Carbon (RegisterEventHotKey) |
-| API Calls | URLSession (REST) |
-| Secure Storage | Security Framework (Keychain) |
-| Markdown | AttributedString |
+| API | URLSession + Gemini REST API |
+| Storage | Security Framework (Keychain) |
 
-## API Reference
+### API Endpoint
 
-### Gemini API Endpoint
+\`\`\`
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent
+\`\`\`
 
-```
-POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=YOUR_KEY
-```
+## ❓ Xử lý lỗi
 
-### Request Format
+| Lỗi | Giải pháp |
+|-----|-----------|
+| Không chụp được màn hình | Kiểm tra quyền Screen Recording |
+| Phím tắt không hoạt động | Kiểm tra conflict với app khác |
+| API Error | Kiểm tra API key trong Settings |
 
-```json
-{
-  "contents": [{
-    "parts": [
-      { "text": "Analyze this image..." },
-      { "inline_data": { "mime_type": "image/jpeg", "data": "BASE64_IMAGE" } }
-    ]
-  }],
-  "generationConfig": {
-    "temperature": 0.4,
-    "maxOutputTokens": 4096
-  }
-}
-```
+## 📄 License
 
-## Troubleshooting
+MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 
-### Screen Capture Not Working
+---
 
-1. Check `System Settings > Privacy & Security > Screen Recording`
-2. Ensure GeminiSnap is enabled
-3. Restart the app after granting permission
+<div align="center">
 
-### Global Hotkey Not Working
+## 👨‍💻 Tác giả
 
-- The hotkey `Cmd + Shift + .` may conflict with other apps
-- Check that no other app is using this shortcut
-- Restart GeminiSnap
+**Nguyễn Xuân Hải**
 
-### API Errors
+[![GitHub](https://img.shields.io/badge/GitHub-xuanhai0913-181717?style=for-the-badge&logo=github)](https://github.com/xuanhai0913)
 
-| Error | Solution |
-|-------|----------|
-| "Invalid API Key" | Verify your key in Settings |
-| "Network error" | Check internet connection |
-| "No content" | Try a different image |
+---
 
-## License
+**© 2025 Nguyễn Xuân Hải (xuanhai0913). All rights reserved.**
 
-MIT License - See LICENSE file for details.
+Made with ❤️ in Vietnam 🇻🇳
 
-## Credits
+⭐ Nếu thấy hữu ích, hãy star repo này nhé!
 
-- Google Gemini API for AI analysis
-- Apple's SwiftUI and AppKit frameworks
+</div>

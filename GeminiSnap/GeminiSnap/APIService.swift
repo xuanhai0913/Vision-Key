@@ -61,7 +61,7 @@ enum AnswerMode: String, CaseIterable {
             return """
             Trả lời bằng tiếng Việt. Giải thích RÕ RÀNG và CHI TIẾT.
             
-            - Bài toán: giải từng bước, giải thích công thức
+            - Bài toán: giải từng bước
             - Code: giải thích lỗi, tại sao sai, cách sửa
             - Câu hỏi: trả lời đầy đủ với ví dụ nếu cần
             - Văn bản: phân tích và tóm tắt ý chính

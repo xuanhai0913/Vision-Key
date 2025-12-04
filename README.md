@@ -41,7 +41,7 @@
 
 ### Build từ Source
 
-\`\`\`bash
+```bash
 # Clone repository
 git clone https://github.com/xuanhai0913/Vision-Key.git
 cd Vision-Key
@@ -50,7 +50,7 @@ cd Vision-Key
 open GeminiSnap/GeminiSnap.xcodeproj
 
 # Build và Run (Cmd + R)
-\`\`\`
+```
 
 ### Cấp quyền
 

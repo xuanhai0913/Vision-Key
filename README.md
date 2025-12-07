@@ -4,7 +4,9 @@
 
 ![Vision Key Logo](https://img.shields.io/badge/Vision_Key-AI_Screen_Assistant-purple?style=for-the-badge&logo=apple)
 
-<img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001214/Logo_st3nmr.png" width="90%" alt="Vision Key Logo" />
+<a href="https://www.hailamdev.space/">
+  <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001214/Logo_st3nmr.png" width="90%" alt="Vision Key Logo" />
+</a>
 
 ###  Cross-Platform Support:
 
@@ -155,8 +157,9 @@ MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ## 👨‍💻 Tác giả
 <div align="center">
-  <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001229/Icon_y7wrcf.png" width="40%" alt="Vision Key Demo" />
-</div>
+  <a href="https://www.hailamdev.space/">
+    <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001229/Icon_y7wrcf.png" width="40%" alt="Vision Key Demo" />
+  </a>
 **Nguyễn Xuân Hải**
 
 [![GitHub](https://img.shields.io/badge/GitHub-xuanhai0913-181717?style=for-the-badge&logo=github)](https://github.com/xuanhai0913)

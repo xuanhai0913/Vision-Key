@@ -2,7 +2,17 @@
 
 <div align="center">
 
-![Vision Key Logo](https://img.shields.io/badge/Vision_Key-AI_Screen_Assistant-purple?style=for-the-badge&logo=apple)
+<img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001214/Logo_st3nmr.png" width="90%" alt="Vision Key Logo" />
+
+###  Cross-Platform Support:
+
+| Platform | Status | Link / Repository |
+|:--------:|:------:|:------------------|
+|  **macOS (Native)** |  **Stable** | [**Vision-Key**](https://github.com/xuanhai0913/Vision-Key) <br> *(Current)* <br> [![Stars](https://img.shields.io/github/stars/xuanhai0913/Vision-Key?style=social)](https://github.com/xuanhai0913/Vision-Key) |
+|  **Browser Extension** |  **Stable** | [**Chrome/Edge**](https://github.com/xuanhai0913/Extension-Vision-Key) <br> [![Ext Stars](https://img.shields.io/github/stars/xuanhai0913/Extension-Vision-Key?style=social)](https://github.com/xuanhai0913/Extension-Vision-Key) |
+|  **Windows (Native)** | 🚧 **Dev** | *Coming soon...* |
+
+---
 
 [![macOS](https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square)](https://www.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/Swift-5.9+-orange?style=flat-square&logo=swift)](https://swift.org/)
@@ -10,7 +20,11 @@
 [![Gemini](https://img.shields.io/badge/Gemini_2.5_Pro-API-4285F4?style=flat-square&logo=google)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)](LICENSE)
 
+
+
 **Ứng dụng menu bar macOS tích hợp AI Gemini để phân tích ảnh chụp màn hình**
+
+
 
 [Tính năng](#-tính-năng) • [Cài đặt](#-cài-đặt) • [Sử dụng](#-sử-dụng) • [Phát triển](#-phát-triển)
 
@@ -138,7 +152,9 @@ MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 <div align="center">
 
 ## 👨‍💻 Tác giả
-
+<div align="center">
+  <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001229/Icon_y7wrcf.png" width="40%" alt="Vision Key Demo" />
+</div>
 **Nguyễn Xuân Hải**
 
 [![GitHub](https://img.shields.io/badge/GitHub-xuanhai0913-181717?style=for-the-badge&logo=github)](https://github.com/xuanhai0913)

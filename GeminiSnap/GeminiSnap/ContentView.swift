@@ -11,6 +11,7 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var menuBarManager: MenuBarManager
     @State private var showSettings = false
+    @State private var showHistory = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -38,8 +39,18 @@ struct ContentView: View {
         }
         .frame(width: 400, height: 500)
         .background(Color(NSColor.windowBackgroundColor))
-        .sheet(isPresented: $showSettings) {
-            SettingsView(isPresented: $showSettings)
+        .onChange(of: showSettings) { newValue in
+            if newValue {
+                // Open Settings in separate window instead of sheet
+                SettingsWindowController.shared.showSettings()
+                showSettings = false // Reset immediately
+            }
+        }
+        .sheet(isPresented: $showHistory) {
+            HistoryView(isPresented: $showHistory, onSelect: { item in
+                menuBarManager.resultText = item.answer
+                showHistory = false
+            })
         }
     }
     
@@ -99,6 +110,11 @@ struct ContentView: View {
                         }
                         .keyboardShortcut(",", modifiers: .command)
                         
+                        Button(action: { showHistory = true }) {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                        .keyboardShortcut("h", modifiers: .command)
+                        
                         Divider()
                         
                         Button(action: { menuBarManager.quit() }) {
@@ -130,38 +146,77 @@ struct ContentView: View {
     // MARK: - Answer Mode Toggle
     
     private var answerModeToggle: some View {
-        HStack(spacing: 0) {
-            ForEach(AnswerMode.allCases, id: \.self) { mode in
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        menuBarManager.answerMode = mode
+        HStack(spacing: 8) {
+            // Mode buttons
+            HStack(spacing: 0) {
+                ForEach(AnswerMode.allCases, id: \.self) { mode in
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            menuBarManager.answerMode = mode
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: mode.icon)
+                                .font(.caption)
+                            Text(mode.rawValue)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            menuBarManager.answerMode == mode
+                                ? Color.accentColor
+                                : Color.clear
+                        )
+                        .foregroundColor(
+                            menuBarManager.answerMode == mode
+                                ? .white
+                                : .secondary
+                        )
                     }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: mode.icon)
-                            .font(.caption)
-                        Text(mode.rawValue)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        menuBarManager.answerMode == mode
-                            ? Color.accentColor
-                            : Color.clear
-                    )
-                    .foregroundColor(
-                        menuBarManager.answerMode == mode
-                            ? .white
-                            : .secondary
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .background(Color.secondary.opacity(0.15))
+            .cornerRadius(8)
+            
+            // Language picker
+            languagePicker
         }
-        .background(Color.secondary.opacity(0.15))
-        .cornerRadius(8)
+    }
+    
+    private var languagePicker: some View {
+        Menu {
+            ForEach(ResponseLanguage.allCases) { lang in
+                Button(action: {
+                    AIServiceManager.shared.currentLanguage = lang
+                }) {
+                    HStack {
+                        Text(lang.icon)
+                        Text(lang.rawValue)
+                        if AIServiceManager.shared.currentLanguage == lang {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(AIServiceManager.shared.currentLanguage.icon)
+                    .font(.caption)
+                Image(systemName: "chevron.down")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.15))
+            .cornerRadius(6)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .help("Response language")
     }
     
     // MARK: - Expert Context Input
@@ -211,4 +266,166 @@ struct ContentView: View {
 #Preview {
     ContentView(menuBarManager: MenuBarManager())
         .frame(width: 400, height: 500)
+}
+
+// MARK: - History View
+
+struct HistoryView: View {
+    @Binding var isPresented: Bool
+    var onSelect: (HistoryItem) -> Void
+    @ObservedObject private var historyManager = HistoryManager.shared
+    @State private var showFavoritesOnly = false
+    
+    var filteredItems: [HistoryItem] {
+        showFavoritesOnly ? historyManager.favorites : historyManager.items
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundColor(.accentColor)
+                Text("History")
+                    .font(.headline)
+                Spacer()
+                
+                Toggle(isOn: $showFavoritesOnly) {
+                    Image(systemName: showFavoritesOnly ? "star.fill" : "star")
+                        .foregroundColor(.yellow)
+                }
+                .toggleStyle(.button)
+                .buttonStyle(.plain)
+                
+                Button(action: { isPresented = false }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding()
+            
+            Divider()
+            
+            // List
+            if filteredItems.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: showFavoritesOnly ? "star.slash" : "clock")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text(showFavoritesOnly ? "No favorites yet" : "No history yet")
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(filteredItems) { item in
+                        HistoryItemRow(item: item, onTap: {
+                            onSelect(item)
+                        }, onToggleFavorite: {
+                            historyManager.toggleFavorite(item)
+                        }, onDelete: {
+                            historyManager.deleteItem(item)
+                        })
+                    }
+                }
+                .listStyle(.plain)
+            }
+            
+            Divider()
+            
+            // Footer
+            HStack {
+                Text("\(filteredItems.count) items")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button("Clear All") {
+                    historyManager.clearHistory(keepFavorites: true)
+                }
+                .font(.caption)
+                .disabled(historyManager.items.isEmpty)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
+        .frame(width: 380, height: 450)
+    }
+}
+
+struct HistoryItemRow: View {
+    let item: HistoryItem
+    var onTap: () -> Void
+    var onToggleFavorite: () -> Void
+    var onDelete: () -> Void
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            // Thumbnail
+            if let imageData = item.imageData, let img = HistoryManager.imageFromBase64(imageData) {
+                Image(nsImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 40, height: 40)
+                    .cornerRadius(6)
+                    .clipped()
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.secondary)
+                    )
+            }
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(item.provider)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.2))
+                        .cornerRadius(4)
+                    
+                    Text(item.mode)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    Text(item.displayDate)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Text(item.shortAnswer)
+                    .font(.caption)
+                    .lineLimit(2)
+            }
+            
+            // Actions
+            VStack(spacing: 4) {
+                Button(action: onToggleFavorite) {
+                    Image(systemName: item.isFavorite ? "star.fill" : "star")
+                        .foregroundColor(item.isFavorite ? .yellow : .secondary)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red.opacity(0.7))
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+    }
 }

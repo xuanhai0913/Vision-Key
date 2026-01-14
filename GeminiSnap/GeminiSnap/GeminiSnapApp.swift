@@ -31,10 +31,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize the menu bar manager
         menuBarManager = MenuBarManager()
         
-        // Initialize global hotkey (Cmd + Shift + .)
-        hotkeyManager = HotkeyManager { [weak self] in
-            self?.menuBarManager?.triggerScreenCapture()
-        }
+        // Initialize global hotkeys:
+        // - ⌘ + ⇧ + . (Period) = Region capture
+        // - ⌘ + ⇧ + , (Comma) = Fullscreen capture
+        // - ⌘ + ⇧ + / (Slash) = Voice input
+        hotkeyManager = HotkeyManager(
+            regionCallback: { [weak self] in
+                self?.menuBarManager?.triggerScreenCapture()
+            },
+            fullscreenCallback: { [weak self] in
+                self?.menuBarManager?.triggerFullscreenCapture()
+            },
+            voiceCallback: { [weak self] in
+                self?.menuBarManager?.triggerVoiceInput()
+            }
+        )
         
         // Hide dock icon (backup - also set via LSUIElement in Info.plist)
         NSApp.setActivationPolicy(.accessory)

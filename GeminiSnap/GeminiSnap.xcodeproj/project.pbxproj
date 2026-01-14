@@ -17,6 +17,7 @@
 		0008 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1008 /* KeychainHelper.swift */; };
 		0009 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1009 /* HotkeyManager.swift */; };
 		0010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2001 /* Assets.xcassets */; };
+		117DBF27471C96EFE64B4DDE /* FloatingAnswerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		3001 /* GeminiSnap.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GeminiSnap.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5001 /* GeminiSnap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GeminiSnap.entitlements; sourceTree = "<group>"; };
+		B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FloatingAnswerPanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,6 +71,7 @@
 				2001 /* Assets.xcassets */,
 				4001 /* Info.plist */,
 				5001 /* GeminiSnap.entitlements */,
+				B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */,
 			);
 			path = GeminiSnap;
 			sourceTree = "<group>";
@@ -159,6 +162,7 @@
 				0007 /* ContentView.swift in Sources */,
 				0008 /* KeychainHelper.swift in Sources */,
 				0009 /* HotkeyManager.swift in Sources */,
+				117DBF27471C96EFE64B4DDE /* FloatingAnswerPanel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

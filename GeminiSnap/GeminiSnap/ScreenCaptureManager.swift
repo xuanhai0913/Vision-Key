@@ -13,16 +13,29 @@ class ScreenCaptureManager {
     
     private init() {}
     
+    /// Capture a selected region of the screen (interactive mode)
+    /// User can drag to select an area
     func captureScreen(completion: @escaping (NSImage?) -> Void) {
-        // Use macOS built-in screencapture tool - most reliable method
+        // -i: interactive mode (select region)
+        // -x: no sound
+        runScreenCapture(arguments: ["-i", "-x"], completion: completion)
+    }
+    
+    /// Capture the entire screen (fullscreen mode)
+    /// No user interaction required
+    func captureFullScreen(completion: @escaping (NSImage?) -> Void) {
+        // -x: no sound
+        // No -i flag = capture entire screen immediately
+        runScreenCapture(arguments: ["-x"], completion: completion)
+    }
+    
+    /// Shared helper to run screencapture with given arguments
+    private func runScreenCapture(arguments: [String], completion: @escaping (NSImage?) -> Void) {
         let tempFile = NSTemporaryDirectory() + "geminisnap_\(UUID().uuidString).png"
         
-        // -i: interactive mode (select region)
-        // -s: only allow selection (no window capture)
-        // -x: no sound
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        process.arguments = ["-i", "-x", tempFile]
+        process.arguments = arguments + [tempFile]
         
         do {
             try process.run()

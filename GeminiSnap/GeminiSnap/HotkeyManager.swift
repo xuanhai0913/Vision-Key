@@ -10,28 +10,32 @@ import Carbon
 import AppKit
 
 enum CaptureMode {
-    case region      // ⌘ + ⇧ + . (Period) - Select region
-    case fullscreen  // ⌘ + ⇧ + , (Comma) - Full screen
-    case voice       // ⌘ + ⇧ + / (Slash) - Voice input
+    case region       // ⌘ + ⇧ + . (Period) - Select region
+    case fullscreen   // ⌘ + ⇧ + , (Comma) - Full screen
+    case voice        // ⌘ + ⇧ + / (Slash) - Voice input
+    case instantQuiz  // ⌘ + ⇧ + M - Instant Quiz (fullscreen + fastest model + auto-click)
 }
 
 class HotkeyManager {
     private var regionHotKeyRef: EventHotKeyRef?
     private var fullscreenHotKeyRef: EventHotKeyRef?
     private var voiceHotKeyRef: EventHotKeyRef?
+    private var instantQuizHotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     
     private var regionCallback: (() -> Void)?
     private var fullscreenCallback: (() -> Void)?
     private var voiceCallback: (() -> Void)?
+    private var instantQuizCallback: (() -> Void)?
     
     // Static reference for the C callback
     private static var sharedInstance: HotkeyManager?
     
-    init(regionCallback: @escaping () -> Void, fullscreenCallback: @escaping () -> Void, voiceCallback: (() -> Void)? = nil) {
+    init(regionCallback: @escaping () -> Void, fullscreenCallback: @escaping () -> Void, voiceCallback: (() -> Void)? = nil, instantQuizCallback: (() -> Void)? = nil) {
         self.regionCallback = regionCallback
         self.fullscreenCallback = fullscreenCallback
         self.voiceCallback = voiceCallback
+        self.instantQuizCallback = instantQuizCallback
         HotkeyManager.sharedInstance = self
         registerHotkeys()
     }
@@ -70,6 +74,8 @@ class HotkeyManager {
                     HotkeyManager.sharedInstance?.handleFullscreenCapture()
                 case 3:
                     HotkeyManager.sharedInstance?.handleVoiceInput()
+                case 4:
+                    HotkeyManager.sharedInstance?.handleInstantQuiz()
                 default:
                     break
                 }
@@ -146,6 +152,26 @@ class HotkeyManager {
         } else {
             print("❌ Failed to register voice hotkey: \(voiceStatus)")
         }
+        
+        // Register Instant Quiz: ⌘ + ⇧ + M (M key, keycode 46)
+        var instantQuizHotKeyID = EventHotKeyID()
+        instantQuizHotKeyID.signature = OSType(0x47534E50) // "GSNP"
+        instantQuizHotKeyID.id = 4
+        
+        let instantQuizStatus = RegisterEventHotKey(
+            46, // M key
+            modifiers,
+            instantQuizHotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &instantQuizHotKeyRef
+        )
+        
+        if instantQuizStatus == noErr {
+            print("✅ Global hotkey registered: ⌘ + ⇧ + M (Instant Quiz)")
+        } else {
+            print("❌ Failed to register instant quiz hotkey: \(instantQuizStatus)")
+        }
     }
     
     private func handleRegionCapture() {
@@ -166,6 +192,12 @@ class HotkeyManager {
         }
     }
     
+    private func handleInstantQuiz() {
+        DispatchQueue.main.async { [weak self] in
+            self?.instantQuizCallback?()
+        }
+    }
+    
     func unregisterHotkey() {
         if let hotKeyRef = regionHotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
@@ -180,6 +212,11 @@ class HotkeyManager {
         if let hotKeyRef = voiceHotKeyRef {
             UnregisterEventHotKey(hotKeyRef)
             self.voiceHotKeyRef = nil
+        }
+        
+        if let hotKeyRef = instantQuizHotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+            self.instantQuizHotKeyRef = nil
         }
         
         if let eventHandler = eventHandler {

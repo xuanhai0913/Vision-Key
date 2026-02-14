@@ -259,6 +259,180 @@ class MenuBarManager: ObservableObject {
         }
     }
     
+    // MARK: - Instant Quiz Capture
+    
+    /// Instant Quiz Mode: ⌘+⇧+N
+    /// - Captures fullscreen immediately (no region selection)
+    /// - Uses the fastest available model
+    /// - Forces Trắc nghiệm mode for quick answer
+    /// - Auto-clicks answer immediately
+    /// - Only shows minimal floating popup
+    func triggerInstantQuizCapture() {
+        // Close popover before capture
+        closePopover()
+        
+        // Minimal delay for instant response
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.startInstantQuizCapture()
+        }
+    }
+    
+    private func startInstantQuizCapture() {
+        // Use fullscreen capture for instant mode (faster, no selection needed)
+        ScreenCaptureManager.shared.captureFullScreen { [weak self] image in
+            DispatchQueue.main.async {
+                guard let self = self, let image = image else { return }
+                
+                // Get the capture rect (set by captureFullScreen)
+                self.lastCaptureRect = ScreenCaptureManager.shared.lastCaptureRect
+                
+                self.capturedImage = image
+                self.resultText = nil
+                self.errorMessage = nil
+                self.isLoading = true
+                
+                // Force Trắc nghiệm mode for instant quiz
+                let savedMode = self.answerMode
+                self.answerMode = .tracNghiem
+                
+                // Use fastest model
+                self.analyzeImageWithFastestModel(image) { [weak self] result in
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        self.isLoading = false
+                        self.answerMode = savedMode
+                        
+                        switch result {
+                        case .success(let text):
+                            let answer = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            self.resultText = answer
+                            
+                            // Check if stealth mode - skip popup if enabled
+                            let stealthMode = UserDefaults.standard.bool(forKey: "stealthModeEnabled")
+                            if !stealthMode {
+                                // Show minimal floating popup only if not in stealth mode
+                                FloatingAnswerPanel.shared.show(
+                                    answer: answer,
+                                    autoDismissAfter: 3
+                                ) { [weak self] in
+                                    self?.showPopover()
+                                }
+                            }
+                            
+                            // Copy to clipboard
+                            self.copyToClipboard(answer)
+                            
+                            // Extract first answer letter for auto-click
+                            let firstAnswer = self.extractFirstAnswerLetter(from: answer)
+                            print("🔍 Instant Mode - Answer: '\(answer)', FirstLetter: '\(firstAnswer)', AutoClickEnabled: \(self.autoClickEnabled)")
+                            print("🔍 CaptureRect: \(self.lastCaptureRect)")
+                            
+                            if !firstAnswer.isEmpty {
+                                // Always auto-click in instant mode (ignore settings)
+                                print("🎯 Triggering auto-click for: \(firstAnswer)")
+                                self.performAutoClick(forAnswer: firstAnswer)
+                            } else {
+                                print("⚠️ No answer letter extracted from: \(answer)")
+                            }
+                            
+                            // Save to history
+                            HistoryManager.shared.addItem(
+                                provider: "Instant",
+                                model: "flash",
+                                mode: AnswerMode.tracNghiem.rawValue,
+                                expertContext: nil,
+                                answer: answer,
+                                image: image
+                            )
+                            
+                        case .failure(let error):
+                            self.errorMessage = error.localizedDescription
+                            // Show error in floating popup
+                            FloatingAnswerPanel.shared.show(
+                                answer: "❌ Error: \(error.localizedDescription)",
+                                autoDismissAfter: 4
+                            ) { [weak self] in
+                                self?.showPopover()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Analyze image with fastest available model
+    private func analyzeImageWithFastestModel(_ image: NSImage, completion: @escaping (Result<String, APIError>) -> Void) {
+        // Priority: Gemini flash models (fastest with vision support)
+        let fastModels = [
+            ("gemini-2.5-flash", AIProviderType.gemini),
+            ("gemini-2.0-flash", AIProviderType.gemini),
+            ("gemini-flash-latest", AIProviderType.gemini),
+            ("gpt-4o-mini", AIProviderType.openai)
+        ]
+        
+        // Check if MIS Mode is enabled
+        let misModeEnabled = UserDefaults.standard.bool(forKey: "misModeEnabled")
+        
+        // MIS Context for Management Information Systems exam
+        let misContext = misModeEnabled ? """
+        🎓 BỐI CẢNH: Đây là câu hỏi thi môn "Xây dựng Hệ thống Thông tin Quản lý" (MIS - Management Information Systems).
+        
+        📚 TÀI LIỆU THAM KHẢO CHÍNH:
+        - "Using MIS" - David M. Kroenke & Randall J. Boyle, Pearson Global Edition 9th
+        
+        🔍 KIẾN THỨC CẦN NHỚ:
+        - SDLC (Systems Development Life Cycle): Planning, Analysis, Design, Implementation, Maintenance
+        - Business Processes: BP, BPM, BPMS
+        - Database: DBMS, ERD, Normalization, SQL
+        - Enterprise Systems: ERP, CRM, SCM
+        - Security: CIA Triad, Authentication, Encryption
+        - Cloud Computing: IaaS, PaaS, SaaS
+        - E-commerce, Social Media, Business Intelligence
+        
+        Nếu câu hỏi nằm ngoài sách, hãy dùng kiến thức IT/MIS chung để trả lời.
+        
+        """ : ""
+        
+        // Custom prompt for instant quiz - supports multiple questions and multi-select
+        let instantPrompt = """
+        \(misContext)Nhìn ảnh và trả lời TẤT CẢ câu hỏi trắc nghiệm trong ảnh.
+        
+        FORMAT TRẢ LỜI (KHÔNG giải thích):
+        [số câu]:[đáp án]
+        
+        QUY TẮC:
+        - Nếu câu hỏi cho chọn NHIỀU đáp án: 2:A,C,D
+        - Nếu câu có 5-7 options (A-G): vẫn trả lời bình thường, ví dụ: 3:E hoặc 3:F,G
+        - Nhiều câu cách nhau bởi dấu cách: 2:B 3:A,C 4:E
+        
+        VÍ DỤ:
+        - Câu đơn đáp án: 2:B 3:C 4:A
+        - Câu nhiều đáp án: 2:A,C,D 3:B
+        - Câu có option E,F,G: 5:F 6:A,E,G
+        
+        Nếu chỉ có 1 câu không rõ số, chỉ trả lời: B (hoặc A,C nếu nhiều đáp án)
+        
+        QUAN TRỌNG: Chỉ output đáp án, không viết gì khác.
+        """
+        
+        // Find first available fast model
+        for (modelId, providerType) in fastModels {
+            if let apiKey = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !apiKey.isEmpty {
+                providerType.provider.analyzeImage(image, apiKey: apiKey, model: modelId, prompt: instantPrompt, completion: completion)
+                return
+            }
+        }
+        
+        // Fallback to current provider with standard prompt
+        AIServiceManager.shared.analyzeImage(
+            image,
+            mode: .tracNghiem,
+            expertContext: expertContext.isEmpty ? nil : expertContext,
+            completion: completion
+        )
+    }
+    
     // MARK: - Voice Input
     
     @Published var isVoiceRecording = false
@@ -607,6 +781,12 @@ class MenuBarManager: ObservableObject {
         
         let imageSize = image.size
         
+        // Get delay from settings (default 0.15s)
+        let delay = UserDefaults.standard.double(forKey: "autoClickDelay")
+        let actualDelay = delay == 0 ? 0.15 : delay
+        
+        print("🔍 performAutoClick - Answer: '\(cleanAnswer)', CaptureRect: \(lastCaptureRect)")
+        
         // Run OCR to get text with coordinates
         OCRManager.shared.extractTextWithCoordinates(from: image, imageSize: imageSize) { [weak self] result in
             guard let self = self else { return }
@@ -614,6 +794,7 @@ class MenuBarManager: ObservableObject {
             switch result {
             case .success(let observations):
                 self.lastOCRObservations = observations
+                print("📝 OCR found \(observations.count) text observations")
                 
                 // Find the answer coordinate
                 if let clickPoint = OCRManager.shared.findAnswerCoordinate(
@@ -622,14 +803,33 @@ class MenuBarManager: ObservableObject {
                     imageSize: imageSize,
                     captureRect: self.lastCaptureRect
                 ) {
-                    // Click ngay lập tức (không delay)
-                    self.simulateClick(at: clickPoint)
+                    print("🎯 Found click point: \(clickPoint)")
+                    // Apply delay before clicking
+                    DispatchQueue.main.asyncAfter(deadline: .now() + actualDelay) {
+                        self.simulateClick(at: clickPoint)
+                        // Update popup to show click success
+                        FloatingAnswerPanel.shared.show(
+                            answer: "\(cleanAnswer) ✓ Clicked!",
+                            autoDismissAfter: 2
+                        ) { }
+                        print("✅ Auto-clicked at (\(clickPoint.x), \(clickPoint.y))")
+                    }
                 } else {
-                    print("⚠️ Auto-click: Could not find answer '\(cleanAnswer)' in OCR results")
+                    print("⚠️ Could not find '\(cleanAnswer)' in OCR. All observations:")
+                    for obs in observations {
+                        print("  - '\(obs.text)' at \(obs.boundingBox)")
+                    }
+                    // Update popup to show not found
+                    DispatchQueue.main.async {
+                        FloatingAnswerPanel.shared.show(
+                            answer: "\(cleanAnswer) (OCR không tìm thấy)",
+                            autoDismissAfter: 3
+                        ) { }
+                    }
                 }
                 
             case .failure(let error):
-                print("❌ Auto-click OCR failed: \(error.localizedDescription)")
+                print("❌ OCR failed: \(error.localizedDescription)")
             }
         }
     }
@@ -729,6 +929,34 @@ class MenuBarManager: ObservableObject {
         }
         
         return nil
+    }
+    
+    /// Extract first answer letter from multi-question format (e.g., "2:B 3:C 4:A" -> "B")
+    private func extractFirstAnswerLetter(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Pattern 1: "2:B" format - extract first answer after colon
+        if let colonRange = trimmed.range(of: ":") {
+            let afterColon = trimmed[colonRange.upperBound...]
+            let letter = afterColon.prefix(1).uppercased()
+            if "ABCD".contains(letter) {
+                return letter
+            }
+        }
+        
+        // Pattern 2: Simple "B" letter
+        if trimmed.count == 1 && "ABCD".contains(trimmed.uppercased()) {
+            return trimmed.uppercased()
+        }
+        
+        // Pattern 3: Find first A/B/C/D letter in text
+        for char in trimmed.uppercased() {
+            if "ABCD".contains(char) {
+                return String(char)
+            }
+        }
+        
+        return ""
     }
     
     // MARK: - Actions

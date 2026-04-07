@@ -35,7 +35,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // - ⌘ + ⇧ + . (Period) = Region capture
         // - ⌘ + ⇧ + , (Comma) = Fullscreen capture
         // - ⌘ + ⇧ + / (Slash) = Voice input
-        // - ⌘ + ⇧ + N = Instant Quiz (fastest capture + auto-click)
+        // - ⌘ + ⇧ + M = Instant Quiz (fastest capture + auto-click)
         hotkeyManager = HotkeyManager(
             regionCallback: { [weak self] in
                 self?.menuBarManager?.triggerScreenCapture()

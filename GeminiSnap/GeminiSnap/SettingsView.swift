@@ -85,7 +85,9 @@ struct SettingsView: View {
         .frame(width: 380, height: 550)
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
-            if let key = KeychainHelper.getAPIKey(forKey: "gemini_api_key") {
+            if let key = KeychainHelper.getAPIKey(forKey: KeychainHelper.geminiKey)
+                ?? KeychainHelper.getAPIKey(forKey: "gemini_api_key")
+                ?? KeychainHelper.getAPIKey(forKey: "GeminiAPIKey") {
                 geminiAPIKey = key
             }
         }
@@ -253,9 +255,10 @@ struct SettingsView: View {
     }
     
     private func saveAPIKey() {
-        if KeychainHelper.saveAPIKey(geminiAPIKey, forKey: "gemini_api_key") {
+        if KeychainHelper.saveAPIKey(geminiAPIKey, forKey: KeychainHelper.geminiKey) {
             validationMessage = "✓ Đã lưu API Key"
-            // Also update for the old key for backward compatibility
+            // Also update legacy keys for backward compatibility.
+            _ = KeychainHelper.saveAPIKey(geminiAPIKey, forKey: "gemini_api_key")
             _ = KeychainHelper.saveAPIKey(geminiAPIKey, forKey: "GeminiAPIKey")
         } else {
             validationMessage = "✗ Lỗi khi lưu"

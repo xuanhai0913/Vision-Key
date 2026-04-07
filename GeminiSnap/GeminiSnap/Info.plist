@@ -30,5 +30,9 @@
     <string>NSApplication</string>
     <key>NSScreenCaptureUsageDescription</key>
     <string>GeminiSnap needs screen capture access to capture screen regions for AI analysis.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>GeminiSnap needs microphone access for voice input and speech-to-text queries.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>GeminiSnap needs speech recognition access to transcribe your voice questions.</string>
 </dict>
 </plist>

@@ -11,6 +11,7 @@ import Security
 
 class KeychainHelper {
     private static let serviceName = "com.geminisnap.app"
+    private static let poolAccountSuffix = "-pool"
     
     // Provider key identifiers
     static let geminiKey = "gemini-api-key"
@@ -18,6 +19,10 @@ class KeychainHelper {
     static let openaiKey = "openai-api-key"
     
     // MARK: - Multi-Provider Support (String-based)
+
+    private static func poolAccountName(for accountName: String) -> String {
+        "\(accountName)\(poolAccountSuffix)"
+    }
     
     /// Save API key for a specific provider key identifier
     static func saveAPIKey(_ apiKey: String, forKey accountName: String) -> Bool {
@@ -33,6 +38,44 @@ class KeychainHelper {
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
         ]
         
+        let status = SecItemAdd(query as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+
+    /// Save a pool of API keys for rotation (stored as JSON)
+    static func saveAPIKeyPool(_ apiKeys: [String], forKey accountName: String) -> Bool {
+        var seen = Set<String>()
+        var normalized: [String] = []
+
+        for key in apiKeys {
+            let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty || seen.contains(trimmed) {
+                continue
+            }
+            seen.insert(trimmed)
+            normalized.append(trimmed)
+        }
+
+        let poolAccount = poolAccountName(for: accountName)
+        deleteAPIKey(forKey: poolAccount)
+
+        // Allow clearing pool by saving empty array.
+        if normalized.isEmpty {
+            return true
+        }
+
+        guard let data = try? JSONEncoder().encode(normalized) else {
+            return false
+        }
+
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: poolAccount,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
+
         let status = SecItemAdd(query as CFDictionary, nil)
         return status == errSecSuccess
     }
@@ -58,6 +101,31 @@ class KeychainHelper {
         
         return apiKey
     }
+
+    /// Get API key pool for rotation
+    static func getAPIKeyPool(forKey accountName: String) -> [String] {
+        let poolAccount = poolAccountName(for: accountName)
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: serviceName,
+            kSecAttrAccount as String: poolAccount,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let keys = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+
+        return keys
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
     
     /// Delete API key for a specific provider key identifier
     @discardableResult
@@ -74,6 +142,10 @@ class KeychainHelper {
     
     /// Check if API key exists for a specific provider key identifier
     static func hasAPIKey(forKey accountName: String) -> Bool {
+        if !getAPIKeyPool(forKey: accountName).isEmpty {
+            return true
+        }
+
         guard let key = getAPIKey(forKey: accountName) else { return false }
         return !key.isEmpty
     }

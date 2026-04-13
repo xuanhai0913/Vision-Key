@@ -623,6 +623,41 @@ class AIServiceManager {
     var currentProvider: AIProvider {
         currentProviderType.provider
     }
+
+    private func rotationIndexKey(for providerType: AIProviderType) -> String {
+        "apiKeyRotationIndex_\(providerType.rawValue)"
+    }
+
+    private func configuredAPIKeys(for providerType: AIProviderType) -> [String] {
+        let pool = KeychainHelper.getAPIKeyPool(forKey: providerType.keychainKey)
+        if !pool.isEmpty {
+            return pool
+        }
+
+        guard let key = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !key.isEmpty else {
+            return []
+        }
+
+        return [key]
+    }
+
+    private func orderedAPIKeysForRequest(providerType: AIProviderType) -> [String] {
+        let keys = configuredAPIKeys(for: providerType)
+        guard keys.count > 1 else {
+            return keys
+        }
+
+        let key = rotationIndexKey(for: providerType)
+        let startIndex = UserDefaults.standard.integer(forKey: key) % keys.count
+        let ordered = Array(keys[startIndex...] + keys[..<startIndex])
+
+        UserDefaults.standard.set((startIndex + 1) % keys.count, forKey: key)
+        return ordered
+    }
+
+    func nextAPIKey(for providerType: AIProviderType) -> String? {
+        orderedAPIKeysForRequest(providerType: providerType).first
+    }
     
     /// Get list of providers that have API keys configured
     var availableProviders: [AIProviderType] {
@@ -685,7 +720,7 @@ class AIServiceManager {
         isRetry: Bool,
         completion: @escaping (Result<String, APIError>) -> Void
     ) {
-        guard let apiKey = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !apiKey.isEmpty else {
+        guard !configuredAPIKeys(for: providerType).isEmpty else {
             // Try fallback if enabled
             if autoFallbackEnabled && !isRetry, let fallback = getNextFallbackProvider(after: providerType) {
                 print("⚠️ No API key for \(providerType.rawValue), falling back to \(fallback.rawValue)")
@@ -723,7 +758,9 @@ class AIServiceManager {
         isRetry: Bool,
         completion: @escaping (Result<String, APIError>) -> Void
     ) {
-        guard let apiKey = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !apiKey.isEmpty else {
+        let apiKeys = orderedAPIKeysForRequest(providerType: providerType)
+
+        guard !apiKeys.isEmpty else {
             if autoFallbackEnabled && !isRetry, let fallback = getNextFallbackProvider(after: providerType) {
                 print("⚠️ No API key for \(providerType.rawValue), falling back to \(fallback.rawValue)")
                 analyzeImageWithPromptAndProvider(image, prompt: prompt, providerType: fallback, isRetry: true, completion: completion)
@@ -734,7 +771,31 @@ class AIServiceManager {
         }
         
         let model = UserDefaults.standard.string(forKey: "selectedModel_\(providerType.rawValue)") ?? providerType.provider.defaultModel
-        
+
+        tryAnalyzeWithAPIKeyList(
+            image,
+            prompt: prompt,
+            providerType: providerType,
+            model: model,
+            apiKeys: apiKeys,
+            keyIndex: 0,
+            isRetry: isRetry,
+            completion: completion
+        )
+    }
+
+    private func tryAnalyzeWithAPIKeyList(
+        _ image: NSImage,
+        prompt: String,
+        providerType: AIProviderType,
+        model: String,
+        apiKeys: [String],
+        keyIndex: Int,
+        isRetry: Bool,
+        completion: @escaping (Result<String, APIError>) -> Void
+    ) {
+        let apiKey = apiKeys[keyIndex]
+
         providerType.provider.analyzeImage(
             image,
             apiKey: apiKey,
@@ -744,15 +805,34 @@ class AIServiceManager {
             switch result {
             case .success:
                 completion(result)
+
             case .failure(let error):
-                // Try fallback on failure if enabled
+                let hasMoreKeys = keyIndex + 1 < apiKeys.count
+
+                if hasMoreKeys {
+                    print("⚠️ \(providerType.rawValue) key #\(keyIndex + 1) failed, retrying with next key")
+                    self?.tryAnalyzeWithAPIKeyList(
+                        image,
+                        prompt: prompt,
+                        providerType: providerType,
+                        model: model,
+                        apiKeys: apiKeys,
+                        keyIndex: keyIndex + 1,
+                        isRetry: isRetry,
+                        completion: completion
+                    )
+                    return
+                }
+
+                // Try fallback provider after all keys of current provider fail
                 if self?.autoFallbackEnabled == true && !isRetry,
                    let fallback = self?.getNextFallbackProvider(after: providerType) {
-                    print("⚠️ \(providerType.rawValue) failed: \(error.localizedDescription), falling back to \(fallback.rawValue)")
+                    print("⚠️ \(providerType.rawValue) all keys failed: \(error.localizedDescription), falling back to \(fallback.rawValue)")
                     self?.analyzeImageWithPromptAndProvider(image, prompt: prompt, providerType: fallback, isRetry: true, completion: completion)
                     return
                 }
-                completion(result)
+
+                completion(.failure(error))
             }
         }
     }

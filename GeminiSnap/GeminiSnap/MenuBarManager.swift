@@ -404,7 +404,7 @@ class MenuBarManager: ObservableObject {
         
         // Find first available fast model
         for (modelId, providerType) in fastModels {
-            if let apiKey = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !apiKey.isEmpty {
+            if let apiKey = AIServiceManager.shared.nextAPIKey(for: providerType), !apiKey.isEmpty {
                 providerType.provider.analyzeImage(image, apiKey: apiKey, model: modelId, prompt: instantPrompt, completion: completion)
                 return
             }
@@ -754,7 +754,7 @@ class MenuBarManager: ObservableObject {
     }
     
     private func analyzeText(_ text: String) {
-        guard let apiKey = KeychainHelper.getAPIKey(forKey: AIServiceManager.shared.currentProviderType.keychainKey) else {
+        guard let apiKey = AIServiceManager.shared.nextAPIKey(for: AIServiceManager.shared.currentProviderType) else {
             errorMessage = "API Key not configured"
             isLoading = false
             return

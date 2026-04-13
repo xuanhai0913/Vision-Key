@@ -24,6 +24,7 @@ extension Notification.Name {
 struct SettingsView: View {
     @Binding var isPresented: Bool
     @State private var geminiAPIKey: String = ""
+    @State private var geminiAPIKeysText: String = ""
     @State private var showAPIKey = false
     @State private var validationMessage: String?
     @State private var selectedModel: String = UserDefaults.standard.string(forKey: "gemini_selectedModel") ?? "gemini-2.0-flash"
@@ -90,6 +91,13 @@ struct SettingsView: View {
                 ?? KeychainHelper.getAPIKey(forKey: "GeminiAPIKey") {
                 geminiAPIKey = key
             }
+
+            let pool = KeychainHelper.getAPIKeyPool(forKey: KeychainHelper.geminiKey)
+            if !pool.isEmpty {
+                geminiAPIKeysText = pool.joined(separator: "\n")
+            } else if !geminiAPIKey.isEmpty {
+                geminiAPIKeysText = geminiAPIKey
+            }
         }
     }
     
@@ -120,6 +128,34 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(geminiAPIKey.isEmpty)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("API Key Pool (mỗi dòng 1 key)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(parseAPIKeyPoolText(geminiAPIKeysText).count) keys")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                TextEditor(text: $geminiAPIKeysText)
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(height: 72)
+                    .padding(4)
+                    .background(Color(NSColor.textBackgroundColor))
+                    .cornerRadius(6)
+
+                HStack {
+                    Spacer()
+                    Button("Save Key Pool") {
+                        saveAPIKeyPool()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(parseAPIKeyPoolText(geminiAPIKeysText).isEmpty)
+                }
             }
             
             if let message = validationMessage {
@@ -277,9 +313,52 @@ struct SettingsView: View {
             // Also update legacy keys for backward compatibility.
             _ = KeychainHelper.saveAPIKey(geminiAPIKey, forKey: "gemini_api_key")
             _ = KeychainHelper.saveAPIKey(geminiAPIKey, forKey: "GeminiAPIKey")
+
+            if parseAPIKeyPoolText(geminiAPIKeysText).isEmpty {
+                geminiAPIKeysText = geminiAPIKey
+                _ = KeychainHelper.saveAPIKeyPool([geminiAPIKey], forKey: KeychainHelper.geminiKey)
+            }
         } else {
             validationMessage = "✗ Lỗi khi lưu"
         }
+    }
+
+    private func saveAPIKeyPool() {
+        let keys = parseAPIKeyPoolText(geminiAPIKeysText)
+        guard !keys.isEmpty else {
+            validationMessage = "✗ Chưa có key hợp lệ"
+            return
+        }
+
+        let savedPool = KeychainHelper.saveAPIKeyPool(keys, forKey: KeychainHelper.geminiKey)
+        let savedPrimary = KeychainHelper.saveAPIKey(keys[0], forKey: KeychainHelper.geminiKey)
+
+        if savedPool && savedPrimary {
+            geminiAPIKey = keys[0]
+            _ = KeychainHelper.saveAPIKey(keys[0], forKey: "gemini_api_key")
+            _ = KeychainHelper.saveAPIKey(keys[0], forKey: "GeminiAPIKey")
+            validationMessage = "✓ Đã lưu \(keys.count) API keys (xoay vòng)"
+        } else {
+            validationMessage = "✗ Lỗi khi lưu key pool"
+        }
+    }
+
+    private func parseAPIKeyPoolText(_ text: String) -> [String] {
+        var seen = Set<String>()
+        var orderedKeys: [String] = []
+
+        let lines = text
+            .components(separatedBy: CharacterSet.newlines)
+            .flatMap { $0.components(separatedBy: ",") }
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for key in lines where !seen.contains(key) {
+            seen.insert(key)
+            orderedKeys.append(key)
+        }
+
+        return orderedKeys
     }
 }
 

@@ -18,6 +18,8 @@
 		0009 /* HotkeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1009 /* HotkeyManager.swift */; };
 		0010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2001 /* Assets.xcassets */; };
 		117DBF27471C96EFE64B4DDE /* FloatingAnswerPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */; };
+		AA11BB01DEADBEEF00000001 /* KnowledgeBaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB02DEADBEEF00000001 /* KnowledgeBaseManager.swift */; };
+		AA11BB03DEADBEEF00000002 /* KnowledgeBaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB04DEADBEEF00000002 /* KnowledgeBaseView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,8 @@
 		4001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		5001 /* GeminiSnap.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GeminiSnap.entitlements; sourceTree = "<group>"; };
 		B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FloatingAnswerPanel.swift; sourceTree = "<group>"; };
+		AA11BB02DEADBEEF00000001 /* KnowledgeBaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeBaseManager.swift; sourceTree = "<group>"; };
+		AA11BB04DEADBEEF00000002 /* KnowledgeBaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeBaseView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +76,8 @@
 				4001 /* Info.plist */,
 				5001 /* GeminiSnap.entitlements */,
 				B9B47904DA03175BEAF07CEB /* FloatingAnswerPanel.swift */,
+				AA11BB02DEADBEEF00000001 /* KnowledgeBaseManager.swift */,
+				AA11BB04DEADBEEF00000002 /* KnowledgeBaseView.swift */,
 			);
 			path = GeminiSnap;
 			sourceTree = "<group>";
@@ -163,6 +169,8 @@
 				0008 /* KeychainHelper.swift in Sources */,
 				0009 /* HotkeyManager.swift in Sources */,
 				117DBF27471C96EFE64B4DDE /* FloatingAnswerPanel.swift in Sources */,
+				AA11BB01DEADBEEF00000001 /* KnowledgeBaseManager.swift in Sources */,
+				AA11BB03DEADBEEF00000002 /* KnowledgeBaseView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

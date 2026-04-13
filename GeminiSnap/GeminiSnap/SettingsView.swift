@@ -159,23 +159,40 @@ struct SettingsView: View {
                 .font(.headline)
                 .foregroundColor(.purple)
             
-            // MIS Mode
+            // Knowledge Base
             Toggle(isOn: Binding(
-                get: { UserDefaults.standard.bool(forKey: "misModeEnabled") },
-                set: { UserDefaults.standard.set($0, forKey: "misModeEnabled") }
+                get: { KnowledgeBaseManager.shared.isEnabled },
+                set: { KnowledgeBaseManager.shared.isEnabled = $0 }
             )) {
                 HStack {
-                    Text("MIS Mode")
+                    Text("Knowledge Base")
                     Text("📚")
                     Spacer()
                 }
             }
             .toggleStyle(.switch)
             
-            Text("Tối ưu cho môn Hệ thống TTQL (Using MIS)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .padding(.leading, 2)
+            HStack {
+                let count = KnowledgeBaseManager.shared.activeDocuments.count
+                Text(count > 0 ? "\(count) tài liệu đang active" : "Chưa có tài liệu nào")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                Button(action: {
+                    KnowledgeBaseWindowController.shared.showKnowledgeBase()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.caption2)
+                        Text("Quản lý")
+                            .font(.caption2)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
             
             Divider()
             

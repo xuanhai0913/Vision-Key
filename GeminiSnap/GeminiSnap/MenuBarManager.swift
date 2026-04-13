@@ -371,32 +371,14 @@ class MenuBarManager: ObservableObject {
             ("gpt-4o-mini", AIProviderType.openai)
         ]
         
-        // Check if MIS Mode is enabled
-        let misModeEnabled = UserDefaults.standard.bool(forKey: "misModeEnabled")
-        
-        // MIS Context for Management Information Systems exam
-        let misContext = misModeEnabled ? """
-        🎓 BỐI CẢNH: Đây là câu hỏi thi môn "Xây dựng Hệ thống Thông tin Quản lý" (MIS - Management Information Systems).
-        
-        📚 TÀI LIỆU THAM KHẢO CHÍNH:
-        - "Using MIS" - David M. Kroenke & Randall J. Boyle, Pearson Global Edition 9th
-        
-        🔍 KIẾN THỨC CẦN NHỚ:
-        - SDLC (Systems Development Life Cycle): Planning, Analysis, Design, Implementation, Maintenance
-        - Business Processes: BP, BPM, BPMS
-        - Database: DBMS, ERD, Normalization, SQL
-        - Enterprise Systems: ERP, CRM, SCM
-        - Security: CIA Triad, Authentication, Encryption
-        - Cloud Computing: IaaS, PaaS, SaaS
-        - E-commerce, Social Media, Business Intelligence
-        
-        Nếu câu hỏi nằm ngoài sách, hãy dùng kiến thức IT/MIS chung để trả lời.
-        
-        """ : ""
+        // Check if Knowledge Base is enabled
+        let knowledgeContext = KnowledgeBaseManager.shared.isEnabled 
+            ? KnowledgeBaseManager.shared.buildContextPrompt() 
+            : ""
         
         // Custom prompt for instant quiz - supports multiple questions and multi-select
         let instantPrompt = """
-        \(misContext)Nhìn ảnh và trả lời TẤT CẢ câu hỏi trắc nghiệm trong ảnh.
+        \(knowledgeContext)Nhìn ảnh và trả lời TẤT CẢ câu hỏi trắc nghiệm trong ảnh.
         
         FORMAT TRẢ LỜI (KHÔNG giải thích):
         [số câu]:[đáp án]

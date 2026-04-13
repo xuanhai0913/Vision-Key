@@ -17,6 +17,8 @@ class FloatingAnswerPanel: NSObject {
     private var panel: NSPanel?
     private var dismissTimer: Timer?
     private var onTap: (() -> Void)?
+    private var clickOutsideMonitor: Any?
+    private var localEventMonitor: Any?
     
     private override init() {
         super.init()
@@ -35,7 +37,7 @@ class FloatingAnswerPanel: NSObject {
         
         // Create the panel
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 40),
+            contentRect: NSRect(x: 0, y: 0, width: 280, height: 60),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -46,7 +48,9 @@ class FloatingAnswerPanel: NSObject {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
+        panel.minSize = NSSize(width: 120, height: 50)
+        panel.maxSize = NSSize(width: 320, height: 120)
         
         // Create SwiftUI content
         let contentView = FloatingAnswerView(
@@ -90,12 +94,41 @@ class FloatingAnswerPanel: NSObject {
                 self?.dismiss()
             }
         }
+        
+        // Setup click-outside monitor to dismiss
+        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            guard let self = self, let panel = self.panel else { return }
+            // Check if click is outside the panel
+            let clickLocation = event.locationInWindow
+            if !panel.frame.contains(NSEvent.mouseLocation) {
+                self.dismiss()
+            }
+        }
+        
+        // Setup ESC key monitor to dismiss
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            if event.keyCode == 53 { // ESC key
+                self?.dismiss()
+                return nil
+            }
+            return event
+        }
     }
     
     /// Dismiss the floating panel with animation
     func dismiss() {
         dismissTimer?.invalidate()
         dismissTimer = nil
+        
+        // Remove event monitors
+        if let monitor = clickOutsideMonitor {
+            NSEvent.removeMonitor(monitor)
+            clickOutsideMonitor = nil
+        }
+        if let monitor = localEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            localEventMonitor = nil
+        }
         
         guard let panel = panel else { return }
         
@@ -198,10 +231,14 @@ struct FloatingAnswerView: View {
                 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.gray.opacity(0.6))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
                 }
                 .buttonStyle(.plain)
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(11)
             }
             
             // Answer badges - supports multiple answers and wrapping
@@ -245,7 +282,7 @@ struct FloatingAnswerView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .frame(minWidth: 80)
+        .frame(minWidth: 120, maxWidth: 300)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.black.opacity(0.9))

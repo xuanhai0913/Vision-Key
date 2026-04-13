@@ -84,6 +84,29 @@ struct ContentView: View {
                 
                 // Action buttons
                 HStack(spacing: 8) {
+                    // Knowledge Base indicator
+                    if KnowledgeBaseManager.shared.isEnabled {
+                        Button(action: {
+                            KnowledgeBaseWindowController.shared.showKnowledgeBase()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "books.vertical.fill")
+                                    .font(.caption2)
+                                let count = KnowledgeBaseManager.shared.activeDocuments.count
+                                Text("\(count)")
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(Color.purple.opacity(0.15))
+                            .foregroundColor(.purple)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Knowledge Base: \(KnowledgeBaseManager.shared.activeDocuments.count) tài liệu active")
+                    }
+                    
                     // API Key status indicator
                     apiKeyStatusIndicator
                     

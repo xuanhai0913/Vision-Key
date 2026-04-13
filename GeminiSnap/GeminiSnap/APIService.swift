@@ -674,7 +674,16 @@ class AIServiceManager {
         }
         
         let lang = language ?? currentLanguage
-        let prompt = mode.buildPrompt(expertContext: expertContext, language: lang)
+        var prompt = mode.buildPrompt(expertContext: expertContext, language: lang)
+        
+        // Inject Knowledge Base context if enabled
+        if KnowledgeBaseManager.shared.isEnabled {
+            let kbContext = KnowledgeBaseManager.shared.buildContextPrompt()
+            if !kbContext.isEmpty {
+                prompt = kbContext + prompt
+            }
+        }
+        
         let model = UserDefaults.standard.string(forKey: "selectedModel_\(providerType.rawValue)") ?? providerType.provider.defaultModel
         
         providerType.provider.analyzeImage(

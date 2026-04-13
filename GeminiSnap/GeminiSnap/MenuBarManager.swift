@@ -459,19 +459,32 @@ class MenuBarManager: ObservableObject {
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: prompt) { [weak self] result in
                     DispatchQueue.main.async {
-                        self?.handleSmartFillResult(result, image: image)
+                        self?.handleSmartFillResult(result, image: image, canRetry: true)
                     }
                 }
             }
         }
     }
 
-    private func handleSmartFillResult(_ result: Result<String, APIError>, image: NSImage) {
+    private func handleSmartFillResult(_ result: Result<String, APIError>, image: NSImage, canRetry: Bool) {
         isLoading = false
 
         switch result {
         case .success(let text):
             let fillText = normalizeSmartFillText(text)
+
+            if canRetry && isLikelyPromptEcho(fillText) {
+                isLoading = true
+                let retryPrompt = buildSmartFillRetryPrompt(language: AIServiceManager.shared.currentLanguage)
+
+                AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: retryPrompt) { [weak self] retryResult in
+                    DispatchQueue.main.async {
+                        self?.handleSmartFillResult(retryResult, image: image, canRetry: false)
+                    }
+                }
+                return
+            }
+
             resultText = fillText
 
             let hadFocusedInput = smartFillFocusedElement != nil
@@ -531,26 +544,92 @@ class MenuBarManager: ObservableObject {
         if language == .vietnamese {
             return """
             \(expertLine)
-            Quan sát ảnh và viết ĐÚNG nội dung cần nhập vào ô input.
+            Bạn đang hỗ trợ người dùng điền ô input bằng nội dung đúng.
+            Nhiệm vụ: đọc ảnh và TRẢ LỜI bài/câu hỏi trong ảnh, KHÔNG chép lại đề bài.
 
             Yêu cầu bắt buộc:
-            - Trả lời ngắn gọn, đúng trọng tâm.
-            - Chỉ trả về nội dung cần điền.
+            - Chỉ trả về nội dung cần dán vào ô input.
             - Không markdown, không bullet, không giải thích.
-            - Nếu có nhiều ý, gói gọn trong 1-3 câu ngắn.
+            - Tuyệt đối không lặp lại nguyên văn đề hoặc prompt trong ảnh.
+            - Nếu là bài viết dạng essay / IELTS Writing Task 2: viết bài hoàn chỉnh 220-320 từ, có quan điểm cá nhân rõ ràng.
+            - Nếu là câu trả lời ngắn hoặc form field: trả lời đúng trọng tâm, ngắn gọn.
             """
         }
 
         return """
         \(expertLine)
-        Analyze the image and output the EXACT text the user should enter into an input field.
+        You are helping the user fill an input field with the correct answer.
+        Task: read the image and ANSWER the question/task shown, DO NOT copy the prompt text.
 
         Requirements:
-        - Keep it concise and focused.
-        - Return only fillable text.
+        - Return only the text that should be pasted into the input.
         - No markdown, no bullets, no explanation.
-        - If multiple points are needed, keep it within 1-3 short sentences.
+        - Never repeat the original prompt sentence from the image.
+        - If it is an essay / IELTS Writing Task 2: write a complete response in 220-320 words with a clear personal stance.
+        - If it is a short-answer field: keep it concise and focused.
         """
+    }
+
+    private func buildSmartFillRetryPrompt(language: ResponseLanguage) -> String {
+        if language == .vietnamese {
+            return """
+            Câu trả lời trước đang bị chép lại đề bài. Hãy sửa lại.
+
+            Hãy trả về CÂU TRẢ LỜI để nộp, không được chép đề trong ảnh.
+            - Nếu là essay / IELTS Writing Task 2: viết bài hoàn chỉnh 220-320 từ.
+            - Nếu là câu ngắn: trả lời ngắn gọn, đúng trọng tâm.
+            - Không markdown, không bullet, không thêm nhãn.
+            """
+        }
+
+        return """
+        The previous output copied the prompt instead of answering.
+
+        Return the actual response to submit, not the prompt text from the image.
+        - Essay / IELTS Writing Task 2: write a complete 220-320 word response.
+        - Short-answer field: concise and focused answer.
+        - No markdown, no bullets, no labels.
+        """
+    }
+
+    private func isLikelyPromptEcho(_ text: String) -> Bool {
+        let lower = text.lowercased()
+
+        let promptIndicators = [
+            "discuss both views and give your own opinion",
+            "some people believe",
+            "đề bài",
+            "task 2",
+            "write about the following",
+            "hãy thảo luận"
+        ]
+
+        let answerIndicators = [
+            "in my opinion",
+            "i believe",
+            "to conclude",
+            "on the one hand",
+            "on the other hand",
+            "theo tôi",
+            "tôi cho rằng",
+            "kết luận"
+        ]
+
+        let hasPromptSignal = promptIndicators.contains { lower.contains($0) }
+        let hasAnswerSignal = answerIndicators.contains { lower.contains($0) }
+
+        if hasPromptSignal && !hasAnswerSignal {
+            return true
+        }
+
+        // If output is very short but still contains classic prompt phrases,
+        // it is likely prompt-echo instead of a real answer.
+        if lower.count < 260,
+           lower.contains("discuss both views") {
+            return true
+        }
+
+        return false
     }
 
     private func captureFocusedInputElement() -> AXUIElement? {
@@ -651,6 +730,15 @@ class MenuBarManager: ObservableObject {
             .replacingOccurrences(of: "\\n+", with: " ", options: .regularExpression)
             .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let removablePrefixes = ["Đề bài:", "Đề:", "Prompt:", "Question:"]
+        for prefix in removablePrefixes where cleaned.hasPrefix(prefix) {
+            cleaned = String(cleaned.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if cleaned.hasPrefix("\"") && cleaned.hasSuffix("\"") && cleaned.count > 1 {
+            cleaned = String(cleaned.dropFirst().dropLast()).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
 
         if cleaned.isEmpty {
             return AIServiceManager.shared.currentLanguage == .vietnamese

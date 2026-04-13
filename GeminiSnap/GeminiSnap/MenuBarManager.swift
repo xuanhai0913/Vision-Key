@@ -34,6 +34,8 @@ class MenuBarManager: ObservableObject {
     private var lastCaptureRect: CGRect = .zero     // Vị trí capture trên màn hình
     private var lastOCRObservations: [OCRManager.TextObservation] = [] // OCR text với coordinates
     private var smartFillFocusedElement: AXUIElement?
+    private var smartFillSourceAppPID: pid_t?
+    private var smartFillSourceBundleID: String?
     
     private var settingsObserver: NSObjectProtocol?
     
@@ -429,6 +431,8 @@ class MenuBarManager: ObservableObject {
 
         // Capture focused input before user starts selecting capture region.
         smartFillFocusedElement = captureFocusedInputElement()
+        smartFillSourceAppPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        smartFillSourceBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             self?.startSmartFillCapture()
@@ -441,6 +445,8 @@ class MenuBarManager: ObservableObject {
                 guard let self = self else { return }
                 guard let image = image else {
                     self.smartFillFocusedElement = nil
+                    self.smartFillSourceAppPID = nil
+                    self.smartFillSourceBundleID = nil
                     return
                 }
 
@@ -470,19 +476,32 @@ class MenuBarManager: ObservableObject {
 
             let hadFocusedInput = smartFillFocusedElement != nil
             var didAutoFill = false
+            var didFallbackPaste = false
 
             if let focusedElement = smartFillFocusedElement {
                 didAutoFill = fillTextIntoFocusedInput(fillText, element: focusedElement)
+
+                if !didAutoFill {
+                    didFallbackPaste = attemptSmartFillPasteFallback(fillText)
+                }
             }
             smartFillFocusedElement = nil
 
             // Always ensure user can paste manually when auto-fill is not possible.
-            if quickCopyEnabled || !didAutoFill {
+            if quickCopyEnabled || (!didAutoFill && !didFallbackPaste) {
                 copyToClipboard(fillText)
             }
 
-            let popupText = buildSmartFillPopupText(fillText, didAutoFill: didAutoFill, hadFocusedInput: hadFocusedInput)
+            let popupText = buildSmartFillPopupText(
+                fillText,
+                didAutoFill: didAutoFill,
+                didFallbackPaste: didFallbackPaste,
+                hadFocusedInput: hadFocusedInput
+            )
             FloatingAnswerPanel.shared.show(answer: popupText, autoDismissAfter: didAutoFill ? 2.5 : 6) { }
+
+            smartFillSourceAppPID = nil
+            smartFillSourceBundleID = nil
 
             HistoryManager.shared.addItem(
                 provider: AIServiceManager.shared.currentProviderType.rawValue,
@@ -495,6 +514,8 @@ class MenuBarManager: ObservableObject {
 
         case .failure(let error):
             smartFillFocusedElement = nil
+            smartFillSourceAppPID = nil
+            smartFillSourceBundleID = nil
             errorMessage = error.localizedDescription
 
             FloatingAnswerPanel.shared.show(
@@ -581,6 +602,12 @@ class MenuBarManager: ObservableObject {
     }
 
     private func fillTextIntoFocusedInput(_ text: String, element: AXUIElement) -> Bool {
+        _ = AXUIElementSetAttributeValue(
+            element,
+            kAXFocusedAttribute as CFString,
+            kCFBooleanTrue
+        )
+
         let status = AXUIElementSetAttributeValue(
             element,
             kAXValueAttribute as CFString,
@@ -588,6 +615,30 @@ class MenuBarManager: ObservableObject {
         )
 
         return status == .success
+    }
+
+    private func attemptSmartFillPasteFallback(_ text: String) -> Bool {
+        copyToClipboard(text)
+
+        var targetApp: NSRunningApplication?
+
+        if let pid = smartFillSourceAppPID {
+            targetApp = NSRunningApplication(processIdentifier: pid)
+        }
+
+        if targetApp == nil,
+           let bundleID = smartFillSourceBundleID,
+           let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+            targetApp = app
+        }
+
+        targetApp?.activate(options: [.activateIgnoringOtherApps])
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) { [weak self] in
+            self?.simulatePaste()
+        }
+
+        return targetApp != nil
     }
 
     private func normalizeSmartFillText(_ text: String) -> String {
@@ -610,11 +661,20 @@ class MenuBarManager: ObservableObject {
         return cleaned
     }
 
-    private func buildSmartFillPopupText(_ text: String, didAutoFill: Bool, hadFocusedInput: Bool) -> String {
+    private func buildSmartFillPopupText(
+        _ text: String,
+        didAutoFill: Bool,
+        didFallbackPaste: Bool,
+        hadFocusedInput: Bool
+    ) -> String {
         let concise = concisePopupText(text, maxLength: 120)
 
         if didAutoFill {
             return "Đã điền: \(concise)"
+        }
+
+        if didFallbackPaste {
+            return "Đã dán: \(concise)"
         }
 
         if hadFocusedInput {

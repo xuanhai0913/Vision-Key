@@ -22,11 +22,20 @@ extension Notification.Name {
 }
 
 struct SettingsView: View {
+    enum APIKeyHealthStatus {
+        case testing
+        case alive(String)
+        case dead(String)
+    }
+
     @Binding var isPresented: Bool
     @State private var geminiAPIKey: String = ""
     @State private var geminiAPIKeysText: String = ""
     @State private var showAPIKey = false
     @State private var validationMessage: String?
+    @State private var isTestingKeyPool = false
+    @State private var keyHealthResults: [String: APIKeyHealthStatus] = [:]
+    @State private var testedKeys: [String] = []
     @State private var selectedModel: String = UserDefaults.standard.string(forKey: "gemini_selectedModel") ?? "gemini-2.0-flash"
     
     private let geminiModels = [
@@ -149,12 +158,39 @@ struct SettingsView: View {
                     .cornerRadius(6)
 
                 HStack {
+                    Button("Test All Keys") {
+                        testAllAPIKeys()
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isTestingKeyPool || parseAPIKeyPoolText(geminiAPIKeysText).isEmpty)
+
                     Spacer()
                     Button("Save Key Pool") {
                         saveAPIKeyPool()
                     }
                     .buttonStyle(.bordered)
-                    .disabled(parseAPIKeyPoolText(geminiAPIKeysText).isEmpty)
+                    .disabled(isTestingKeyPool || parseAPIKeyPoolText(geminiAPIKeysText).isEmpty)
+                }
+
+                if isTestingKeyPool {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Đang test key pool...")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if !testedKeys.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(testedKeys, id: \.self) { key in
+                            apiKeyHealthRow(key: key, status: keyHealthResults[key])
+                        }
+                    }
+                    .padding(8)
+                    .background(Color.secondary.opacity(0.08))
+                    .cornerRadius(6)
                 }
             }
             
@@ -320,6 +356,104 @@ struct SettingsView: View {
             }
         } else {
             validationMessage = "✗ Lỗi khi lưu"
+        }
+    }
+
+    private func testAllAPIKeys() {
+        let keys = parseAPIKeyPoolText(geminiAPIKeysText)
+        guard !keys.isEmpty else {
+            validationMessage = "✗ Chưa có key để test"
+            return
+        }
+
+        isTestingKeyPool = true
+        testedKeys = keys
+        keyHealthResults = Dictionary(uniqueKeysWithValues: keys.map { ($0, .testing) })
+        validationMessage = "Đang kiểm tra \(keys.count) key..."
+
+        testAPIKeysSequentially(keys: keys, index: 0, aliveCount: 0)
+    }
+
+    private func testAPIKeysSequentially(keys: [String], index: Int, aliveCount: Int) {
+        if index >= keys.count {
+            isTestingKeyPool = false
+            let deadCount = keys.count - aliveCount
+            validationMessage = "✓ Test xong: \(aliveCount) sống, \(deadCount) chết"
+            return
+        }
+
+        let key = keys[index]
+        GeminiProvider().validateAndFetchModels(apiKey: key) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let models):
+                    self.keyHealthResults[key] = .alive("\(models.count) models")
+                    self.testAPIKeysSequentially(keys: keys, index: index + 1, aliveCount: aliveCount + 1)
+
+                case .failure(let error):
+                    self.keyHealthResults[key] = .dead(error.localizedDescription)
+                    self.testAPIKeysSequentially(keys: keys, index: index + 1, aliveCount: aliveCount)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func apiKeyHealthRow(key: String, status: APIKeyHealthStatus?) -> some View {
+        let masked = maskAPIKey(key)
+
+        HStack(spacing: 8) {
+            Circle()
+                .fill(colorForStatus(status))
+                .frame(width: 8, height: 8)
+
+            Text(masked)
+                .font(.system(.caption2, design: .monospaced))
+                .lineLimit(1)
+
+            Spacer()
+
+            Text(textForStatus(status))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private func maskAPIKey(_ key: String) -> String {
+        if key.count <= 12 {
+            return key
+        }
+
+        let prefix = key.prefix(6)
+        let suffix = key.suffix(4)
+        return "\(prefix)...\(suffix)"
+    }
+
+    private func textForStatus(_ status: APIKeyHealthStatus?) -> String {
+        guard let status else { return "Chưa test" }
+
+        switch status {
+        case .testing:
+            return "Đang test"
+        case .alive(let detail):
+            return "Sống • \(detail)"
+        case .dead(let message):
+            let compact = message.replacingOccurrences(of: "\n", with: " ")
+            return "Chết • \(compact)"
+        }
+    }
+
+    private func colorForStatus(_ status: APIKeyHealthStatus?) -> Color {
+        guard let status else { return .secondary }
+
+        switch status {
+        case .testing:
+            return .orange
+        case .alive:
+            return .green
+        case .dead:
+            return .red
         }
     }
 

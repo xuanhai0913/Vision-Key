@@ -91,12 +91,16 @@ enum AnswerMode: String, CaseIterable {
                 \(expertLine)QUAN TRỌNG: Chỉ trả lời đáp án, KHÔNG GIẢI THÍCH!
                 
                 CHỈ TRẢ LỜI ĐÚNG 1 DÒNG DUY NHẤT:
-                FINAL_ANSWER: X
+                FINAL_ANSWER: ...
                 
-                Trong đó X là A, B, C hoặc D.
+                QUY TẮC FORMAT:
+                - Nếu chỉ có 1 câu: FINAL_ANSWER: B
+                - Nếu có nhiều câu: FINAL_ANSWER: 1:B 2:C 3:A
+                - Nếu 1 câu có nhiều đáp án: FINAL_ANSWER: 2:A,C
+                - Cho phép đáp án A-G nếu đề có nhiều lựa chọn.
                 
                 ❌ SAI: Giải thích dài dòng rồi mới đưa đáp án
-                ✅ ĐÚNG: FINAL_ANSWER: B
+                ✅ ĐÚNG: FINAL_ANSWER: 1:B 2:A,C 3:F
                 
                 Chỉ output 1 dòng. Không viết gì khác.
                 """
@@ -105,12 +109,16 @@ enum AnswerMode: String, CaseIterable {
                 \(expertLine)IMPORTANT: ONLY answer, NO EXPLANATION!
                 
                 OUTPUT EXACTLY ONE LINE:
-                FINAL_ANSWER: X
+                FINAL_ANSWER: ...
                 
-                Where X is A, B, C or D.
+                FORMAT RULES:
+                - Single question: FINAL_ANSWER: B
+                - Multiple questions: FINAL_ANSWER: 1:B 2:C 3:A
+                - Multi-select question: FINAL_ANSWER: 2:A,C
+                - Allow A-G when options go beyond D.
                 
                 ❌ WRONG: Long explanation then answer
-                ✅ CORRECT: FINAL_ANSWER: B
+                ✅ CORRECT: FINAL_ANSWER: 1:B 2:A,C 3:F
                 
                 Only output 1 line. Nothing else.
                 """

@@ -1236,12 +1236,19 @@ class MenuBarManager: ObservableObject {
         // If we found FINAL_ANSWER patterns, return them
         if !answers.isEmpty {
             if answers.count == 1 {
+                if let normalizedMulti = normalizeQuestionAnswerPairs(answers[0]) {
+                    return normalizedMulti
+                }
                 return answers[0]
             } else {
                 return answers.enumerated().map { index, answer in
                     "**Câu \(index + 1):** \(answer)"
                 }.joined(separator: "\n\n")
             }
+        }
+
+        if let normalizedMulti = normalizeQuestionAnswerPairs(text) {
+            return normalizedMulti
         }
         
         // FALLBACK: Nếu không tìm thấy FINAL_ANSWER, thử tìm đáp án khác
@@ -1281,6 +1288,38 @@ class MenuBarManager: ObservableObject {
         
         return nil
     }
+
+    private func normalizeQuestionAnswerPairs(_ text: String) -> String? {
+        let pattern = "(?i)(?:câu|question|q)?\\s*(\\d{1,3})\\s*[:\\.)-]\\s*([A-G](?:\\s*,\\s*[A-G])*)"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        let matches = regex.matches(in: text, range: range)
+
+        guard matches.count >= 2 else {
+            return nil
+        }
+
+        var pairs: [String] = []
+        for match in matches {
+            guard match.numberOfRanges >= 3,
+                  let qRange = Range(match.range(at: 1), in: text),
+                  let aRange = Range(match.range(at: 2), in: text) else {
+                continue
+            }
+
+            let questionNumber = String(text[qRange])
+            let answer = String(text[aRange])
+                .uppercased()
+                .replacingOccurrences(of: "\\s+", with: "", options: .regularExpression)
+
+            pairs.append("\(questionNumber):\(answer)")
+        }
+
+        return pairs.isEmpty ? nil : pairs.joined(separator: " ")
+    }
     
     /// Extract first answer letter from multi-question format (e.g., "2:B 3:C 4:A" -> "B")
     private func extractFirstAnswerLetter(from text: String) -> String {
@@ -1288,9 +1327,9 @@ class MenuBarManager: ObservableObject {
         
         // Pattern 1: "2:B" format - extract first answer after colon
         if let colonRange = trimmed.range(of: ":") {
-            let afterColon = trimmed[colonRange.upperBound...]
+            let afterColon = trimmed[colonRange.upperBound...].trimmingCharacters(in: .whitespaces)
             let letter = afterColon.prefix(1).uppercased()
-            if "ABCD".contains(letter) {
+            if "ABCDEFG".contains(letter) {
                 return letter
             }
         }

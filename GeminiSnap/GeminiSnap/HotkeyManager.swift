@@ -12,7 +12,7 @@ import AppKit
 enum CaptureMode {
     case region       // ⌘ + ⇧ + . (Period) - Select region
     case fullscreen   // ⌘ + ⇧ + , (Comma) - Full screen
-    case voice        // ⌘ + ⇧ + / (Slash) - Voice input
+    case voice        // ⌘ + ⇧ + / (Slash) - Smart Fill tu luan
     case instantQuiz  // ⌘ + ⇧ + M - Instant Quiz (fullscreen + fastest model + auto-click)
 }
 
@@ -133,7 +133,7 @@ class HotkeyManager {
             print("❌ Failed to register fullscreen hotkey: \(fullscreenStatus)")
         }
         
-        // Register Voice Input: ⌘ + ⇧ + / (Slash, keycode 44)
+        // Register Smart Fill: ⌘ + ⇧ + / (Slash, keycode 44)
         var voiceHotKeyID = EventHotKeyID()
         voiceHotKeyID.signature = OSType(0x47534E50) // "GSNP"
         voiceHotKeyID.id = 3
@@ -148,9 +148,9 @@ class HotkeyManager {
         )
         
         if voiceStatus == noErr {
-            print("✅ Global hotkey registered: ⌘ + ⇧ + / (Voice Input)")
+            print("✅ Global hotkey registered: ⌘ + ⇧ + / (Smart Fill)")
         } else {
-            print("❌ Failed to register voice hotkey: \(voiceStatus)")
+            print("❌ Failed to register smart fill hotkey: \(voiceStatus)")
         }
         
         // Register Instant Quiz: ⌘ + ⇧ + M (M key, keycode 46)

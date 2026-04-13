@@ -8,6 +8,7 @@
 
 import SwiftUI
 import AppKit
+import ApplicationServices
 
 class MenuBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
@@ -32,6 +33,7 @@ class MenuBarManager: ObservableObject {
     // For auto-click feature
     private var lastCaptureRect: CGRect = .zero     // Vị trí capture trên màn hình
     private var lastOCRObservations: [OCRManager.TextObservation] = [] // OCR text với coordinates
+    private var smartFillFocusedElement: AXUIElement?
     
     private var settingsObserver: NSObjectProtocol?
     
@@ -415,6 +417,225 @@ class MenuBarManager: ObservableObject {
         )
     }
     
+    // MARK: - Smart Fill Capture (CMD+SHIFT+/)
+
+    /// Smart Fill mode:
+    /// - Capture selected region
+    /// - Generate concise Tu luan answer
+    /// - Auto-fill focused input if possible
+    /// - If no focused input: show concise popup content to fill
+    func triggerSmartFillCapture() {
+        closePopover()
+
+        // Capture focused input before user starts selecting capture region.
+        smartFillFocusedElement = captureFocusedInputElement()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            self?.startSmartFillCapture()
+        }
+    }
+
+    private func startSmartFillCapture() {
+        ScreenCaptureManager.shared.captureScreen { [weak self] image in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard let image = image else {
+                    self.smartFillFocusedElement = nil
+                    return
+                }
+
+                self.capturedImage = image
+                self.resultText = nil
+                self.errorMessage = nil
+                self.isLoading = true
+
+                let prompt = self.buildSmartFillPrompt(language: AIServiceManager.shared.currentLanguage)
+
+                AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: prompt) { [weak self] result in
+                    DispatchQueue.main.async {
+                        self?.handleSmartFillResult(result, image: image)
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleSmartFillResult(_ result: Result<String, APIError>, image: NSImage) {
+        isLoading = false
+
+        switch result {
+        case .success(let text):
+            let fillText = normalizeSmartFillText(text)
+            resultText = fillText
+
+            let hadFocusedInput = smartFillFocusedElement != nil
+            var didAutoFill = false
+
+            if let focusedElement = smartFillFocusedElement {
+                didAutoFill = fillTextIntoFocusedInput(fillText, element: focusedElement)
+            }
+            smartFillFocusedElement = nil
+
+            // Always ensure user can paste manually when auto-fill is not possible.
+            if quickCopyEnabled || !didAutoFill {
+                copyToClipboard(fillText)
+            }
+
+            let popupText = buildSmartFillPopupText(fillText, didAutoFill: didAutoFill, hadFocusedInput: hadFocusedInput)
+            FloatingAnswerPanel.shared.show(answer: popupText, autoDismissAfter: didAutoFill ? 2.5 : 6) { }
+
+            HistoryManager.shared.addItem(
+                provider: AIServiceManager.shared.currentProviderType.rawValue,
+                model: AIServiceManager.shared.currentModel,
+                mode: "Smart Fill",
+                expertContext: expertContext.isEmpty ? nil : expertContext,
+                answer: fillText,
+                image: image
+            )
+
+        case .failure(let error):
+            smartFillFocusedElement = nil
+            errorMessage = error.localizedDescription
+
+            FloatingAnswerPanel.shared.show(
+                answer: "❌ \(error.localizedDescription)",
+                autoDismissAfter: 4
+            ) { }
+        }
+    }
+
+    private func buildSmartFillPrompt(language: ResponseLanguage) -> String {
+        let expertLine = expertContext.isEmpty ? "" : "Bối cảnh chuyên gia: \(expertContext)."
+
+        if language == .vietnamese {
+            return """
+            \(expertLine)
+            Quan sát ảnh và viết ĐÚNG nội dung cần nhập vào ô input.
+
+            Yêu cầu bắt buộc:
+            - Trả lời ngắn gọn, đúng trọng tâm.
+            - Chỉ trả về nội dung cần điền.
+            - Không markdown, không bullet, không giải thích.
+            - Nếu có nhiều ý, gói gọn trong 1-3 câu ngắn.
+            """
+        }
+
+        return """
+        \(expertLine)
+        Analyze the image and output the EXACT text the user should enter into an input field.
+
+        Requirements:
+        - Keep it concise and focused.
+        - Return only fillable text.
+        - No markdown, no bullets, no explanation.
+        - If multiple points are needed, keep it within 1-3 short sentences.
+        """
+    }
+
+    private func captureFocusedInputElement() -> AXUIElement? {
+        guard AXIsProcessTrusted() else {
+            return nil
+        }
+
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedValue: CFTypeRef?
+
+        let status = AXUIElementCopyAttributeValue(
+            systemWideElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedValue
+        )
+
+        guard status == .success, let focusedValue = focusedValue else {
+            return nil
+        }
+
+        let focusedElement = unsafeBitCast(focusedValue, to: AXUIElement.self)
+        return isEditableInputElement(focusedElement) ? focusedElement : nil
+    }
+
+    private func isEditableInputElement(_ element: AXUIElement) -> Bool {
+        var roleValue: CFTypeRef?
+        let roleStatus = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
+        let role = roleStatus == .success ? (roleValue as? String ?? "") : ""
+
+        let editableRoles: Set<String> = [
+            kAXTextFieldRole as String,
+            kAXTextAreaRole as String,
+            kAXComboBoxRole as String,
+            "AXSearchField"
+        ]
+
+        if editableRoles.contains(role) {
+            return true
+        }
+
+        var isSettable = DarwinBoolean(false)
+        let settableStatus = AXUIElementIsAttributeSettable(
+            element,
+            kAXValueAttribute as CFString,
+            &isSettable
+        )
+
+        return settableStatus == .success && isSettable.boolValue
+    }
+
+    private func fillTextIntoFocusedInput(_ text: String, element: AXUIElement) -> Bool {
+        let status = AXUIElementSetAttributeValue(
+            element,
+            kAXValueAttribute as CFString,
+            text as CFTypeRef
+        )
+
+        return status == .success
+    }
+
+    private func normalizeSmartFillText(_ text: String) -> String {
+        var cleaned = text
+            .replacingOccurrences(of: "FINAL_ANSWER:", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "`", with: "")
+            .replacingOccurrences(of: "\\r", with: "")
+
+        cleaned = cleaned
+            .replacingOccurrences(of: "\\n+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if cleaned.isEmpty {
+            return AIServiceManager.shared.currentLanguage == .vietnamese
+                ? "Không có nội dung phù hợp để điền."
+                : "No suitable content to fill."
+        }
+
+        return cleaned
+    }
+
+    private func buildSmartFillPopupText(_ text: String, didAutoFill: Bool, hadFocusedInput: Bool) -> String {
+        let concise = concisePopupText(text, maxLength: 120)
+
+        if didAutoFill {
+            return "Đã điền: \(concise)"
+        }
+
+        if hadFocusedInput {
+            return "Điền tay: \(concise)"
+        }
+
+        return "Điền: \(concise)"
+    }
+
+    private func concisePopupText(_ text: String, maxLength: Int) -> String {
+        let collapsed = text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard collapsed.count > maxLength else {
+            return collapsed
+        }
+
+        return String(collapsed.prefix(maxLength)) + "..."
+    }
+
     // MARK: - Voice Input
     
     @Published var isVoiceRecording = false

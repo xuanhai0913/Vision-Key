@@ -34,7 +34,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize global hotkeys:
         // - ⌘ + ⇧ + . (Period) = Region capture
         // - ⌘ + ⇧ + , (Comma) = Fullscreen capture
-        // - ⌘ + ⇧ + / (Slash) = Voice input
+        // - ⌘ + ⇧ + / (Slash) = Smart Fill (Tu luan capture + fill input)
         // - ⌘ + ⇧ + M = Instant Quiz (fastest capture + auto-click)
         hotkeyManager = HotkeyManager(
             regionCallback: { [weak self] in
@@ -44,7 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.menuBarManager?.triggerFullscreenCapture()
             },
             voiceCallback: { [weak self] in
-                self?.menuBarManager?.triggerVoiceInput()
+                self?.menuBarManager?.triggerSmartFillCapture()
             },
             instantQuizCallback: { [weak self] in
                 self?.menuBarManager?.triggerInstantQuizCapture()

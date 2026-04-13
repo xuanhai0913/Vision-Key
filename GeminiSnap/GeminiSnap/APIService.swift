@@ -652,6 +652,29 @@ class AIServiceManager {
             completion: completion
         )
     }
+
+    func analyzeImageWithCustomPrompt(
+        _ image: NSImage,
+        prompt: String,
+        completion: @escaping (Result<String, APIError>) -> Void
+    ) {
+        var finalPrompt = prompt
+
+        if KnowledgeBaseManager.shared.isEnabled {
+            let kbContext = KnowledgeBaseManager.shared.buildContextPrompt()
+            if !kbContext.isEmpty {
+                finalPrompt = kbContext + finalPrompt
+            }
+        }
+
+        analyzeImageWithPromptAndProvider(
+            image,
+            prompt: finalPrompt,
+            providerType: currentProviderType,
+            isRetry: false,
+            completion: completion
+        )
+    }
     
     private func analyzeImageWithProvider(
         _ image: NSImage,
@@ -683,6 +706,32 @@ class AIServiceManager {
                 prompt = kbContext + prompt
             }
         }
+
+        analyzeImageWithPromptAndProvider(
+            image,
+            prompt: prompt,
+            providerType: providerType,
+            isRetry: isRetry,
+            completion: completion
+        )
+    }
+
+    private func analyzeImageWithPromptAndProvider(
+        _ image: NSImage,
+        prompt: String,
+        providerType: AIProviderType,
+        isRetry: Bool,
+        completion: @escaping (Result<String, APIError>) -> Void
+    ) {
+        guard let apiKey = KeychainHelper.getAPIKey(forKey: providerType.keychainKey), !apiKey.isEmpty else {
+            if autoFallbackEnabled && !isRetry, let fallback = getNextFallbackProvider(after: providerType) {
+                print("⚠️ No API key for \(providerType.rawValue), falling back to \(fallback.rawValue)")
+                analyzeImageWithPromptAndProvider(image, prompt: prompt, providerType: fallback, isRetry: true, completion: completion)
+                return
+            }
+            completion(.failure(.apiError("API Key for \(providerType.rawValue) not set. Please configure in Settings.")))
+            return
+        }
         
         let model = UserDefaults.standard.string(forKey: "selectedModel_\(providerType.rawValue)") ?? providerType.provider.defaultModel
         
@@ -700,7 +749,7 @@ class AIServiceManager {
                 if self?.autoFallbackEnabled == true && !isRetry,
                    let fallback = self?.getNextFallbackProvider(after: providerType) {
                     print("⚠️ \(providerType.rawValue) failed: \(error.localizedDescription), falling back to \(fallback.rawValue)")
-                    self?.analyzeImageWithProvider(image, mode: mode, expertContext: expertContext, language: language, providerType: fallback, isRetry: true, completion: completion)
+                    self?.analyzeImageWithPromptAndProvider(image, prompt: prompt, providerType: fallback, isRetry: true, completion: completion)
                     return
                 }
                 completion(result)

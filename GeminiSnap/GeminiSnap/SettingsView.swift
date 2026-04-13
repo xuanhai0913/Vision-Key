@@ -247,7 +247,7 @@ struct SettingsView: View {
                 shortcutRow(keys: "⌘⇧M", desc: "Instant Quiz")
                 shortcutRow(keys: "⌘⇧.", desc: "Chụp vùng")
                 shortcutRow(keys: "⌘⇧,", desc: "Chụp toàn màn")
-                shortcutRow(keys: "⌘⇧/", desc: "Voice input")
+                shortcutRow(keys: "⌘⇧/", desc: "Smart Fill tự luận")
             }
         }
         .padding()

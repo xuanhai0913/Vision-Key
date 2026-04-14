@@ -473,36 +473,56 @@ class MenuBarManager: ObservableObject {
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: prompt) { [weak self] result in
                     DispatchQueue.main.async {
-                        self?.handleSmartFillResult(result, image: image, canRetry: true)
+                        self?.handleSmartFillResult(result, image: image, retryStep: 0)
                     }
                 }
             }
         }
     }
 
-    private func handleSmartFillResult(_ result: Result<String, APIError>, image: NSImage, canRetry: Bool) {
+    private func handleSmartFillResult(_ result: Result<String, APIError>, image: NSImage, retryStep: Int) {
         isLoading = false
 
         switch result {
         case .success(let text):
             let fillText = normalizeSmartFillText(text)
 
-            if canRetry && isLikelyPromptEcho(fillText) {
+            if isLikelyPromptEcho(fillText) {
+                if retryStep >= 2 {
+                    errorMessage = "AI đang lặp lại đề. Hãy capture rõ hơn hoặc thử lại model khác."
+                    FloatingAnswerPanel.shared.show(
+                        answer: "⚠️ AI đang lặp đề, thử capture lại rõ hơn",
+                        autoDismissAfter: 4
+                    ) { }
+                    resetSmartFillCaptureContext()
+                    return
+                }
+
                 isLoading = true
-                let retryPrompt = buildSmartFillRetryPrompt(
-                    language: AIServiceManager.shared.currentLanguage,
-                    writingModeEnabled: smartFillWritingModeEnabledForCapture
-                )
+                let retryPrompt: String
+
+                if retryStep == 0 {
+                    retryPrompt = buildSmartFillRetryPrompt(
+                        language: AIServiceManager.shared.currentLanguage,
+                        writingModeEnabled: smartFillWritingModeEnabledForCapture
+                    )
+                } else {
+                    retryPrompt = buildSmartFillRescuePrompt(
+                        language: AIServiceManager.shared.currentLanguage,
+                        writingModeEnabled: smartFillWritingModeEnabledForCapture,
+                        capturedPromptText: fillText
+                    )
+                }
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: retryPrompt) { [weak self] retryResult in
                     DispatchQueue.main.async {
-                        self?.handleSmartFillResult(retryResult, image: image, canRetry: false)
+                        self?.handleSmartFillResult(retryResult, image: image, retryStep: retryStep + 1)
                     }
                 }
                 return
             }
 
-            if canRetry && smartFillWritingModeEnabledForCapture && isLikelyIncompleteWriting(fillText) {
+            if smartFillWritingModeEnabledForCapture && isLikelyIncompleteWriting(fillText) && retryStep < 2 {
                 isLoading = true
                 let retryPrompt = buildSmartFillRetryPrompt(
                     language: AIServiceManager.shared.currentLanguage,
@@ -511,7 +531,7 @@ class MenuBarManager: ObservableObject {
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: retryPrompt) { [weak self] retryResult in
                     DispatchQueue.main.async {
-                        self?.handleSmartFillResult(retryResult, image: image, canRetry: false)
+                        self?.handleSmartFillResult(retryResult, image: image, retryStep: retryStep + 1)
                     }
                 }
                 return
@@ -713,6 +733,63 @@ class MenuBarManager: ObservableObject {
         """
     }
 
+    private func buildSmartFillRescuePrompt(
+        language: ResponseLanguage,
+        writingModeEnabled: Bool,
+        capturedPromptText: String
+    ) -> String {
+        let promptSnippet = String(capturedPromptText.prefix(600))
+
+        if language == .vietnamese {
+            if writingModeEnabled {
+                let (minWords, maxWords) = writingWordRange()
+                return """
+                Đây là đề bài OCR đã nhận diện từ ảnh:
+                "\(promptSnippet)"
+
+                YÊU CẦU CỰC KỲ QUAN TRỌNG:
+                - Viết BÀI TRẢ LỜI hoàn chỉnh \(minWords)-\(maxWords) từ.
+                - Tuyệt đối KHÔNG được sao chép nguyên văn câu nào từ đề bài phía trên.
+                - Phải diễn đạt lại bằng lời văn của bạn, có quan điểm cá nhân rõ ràng.
+                - Chỉ output bài trả lời để dán vào ô input.
+                """
+            }
+
+            return """
+            Đây là nội dung đề bài OCR:
+            "\(promptSnippet)"
+
+            Hãy trả lời câu hỏi này bằng nội dung cuối cùng để nộp.
+            - Không sao chép lại đề.
+            - Không markdown, không nhãn.
+            - Chỉ output phần trả lời.
+            """
+        }
+
+        if writingModeEnabled {
+            let (minWords, maxWords) = writingWordRange()
+            return """
+            This is the OCR-detected prompt from the image:
+            "\(promptSnippet)"
+
+            CRITICAL REQUIREMENTS:
+            - Write a complete response of \(minWords)-\(maxWords) words.
+            - Do NOT copy any full sentence from the prompt above.
+            - Paraphrase the task and provide a clear personal stance.
+            - Output only the final response text for pasting.
+            """
+        }
+
+        return """
+        This is the OCR-detected task text:
+        "\(promptSnippet)"
+
+        Provide only the final answer content to submit.
+        - Do not repeat the prompt text.
+        - No markdown, no labels.
+        """
+    }
+
     private func shouldUseAdvancedWritingMode(for targetInputType: SmartFillInputType) -> Bool {
         let enabled = UserDefaults.standard.object(forKey: "smartFillAdvancedWritingEnabled") as? Bool ?? true
         guard enabled else {
@@ -723,7 +800,15 @@ class MenuBarManager: ObservableObject {
         let writingHints = ["writing", "ielts", "toefl", "essay", "task 1", "task 2", "thi writing"]
         let looksLikeWriting = writingHints.contains { context.contains($0) }
 
-        return looksLikeWriting && targetInputType == .longField
+        if answerMode == .tuLuan {
+            return true
+        }
+
+        if looksLikeWriting {
+            return true
+        }
+
+        return targetInputType == .longField && smartFillFocusedExistingLength > 30
     }
 
     private func inferSmartFillInputType() -> SmartFillInputType {

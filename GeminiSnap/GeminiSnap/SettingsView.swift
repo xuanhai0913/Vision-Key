@@ -36,6 +36,12 @@ struct SettingsView: View {
     @State private var isTestingKeyPool = false
     @State private var keyHealthResults: [String: APIKeyHealthStatus] = [:]
     @State private var testedKeys: [String] = []
+    @State private var advancedWritingEnabled: Bool = UserDefaults.standard.object(forKey: "smartFillAdvancedWritingEnabled") as? Bool ?? true
+    @State private var writingPreset: String = UserDefaults.standard.string(forKey: "smartFillWritingPreset") ?? "IELTS Task 2 - Balanced"
+    @State private var writingWordTarget: Int = {
+        let value = UserDefaults.standard.integer(forKey: "smartFillWritingWordTarget")
+        return value == 0 ? 260 : value
+    }()
     @State private var selectedModel: String = UserDefaults.standard.string(forKey: "gemini_selectedModel") ?? "gemini-2.0-flash"
     
     private let geminiModels = [
@@ -43,6 +49,12 @@ struct SettingsView: View {
         "gemini-2.0-flash", 
         "gemini-1.5-flash",
         "gemini-1.5-pro"
+    ]
+
+    private let writingPresets = [
+        "IELTS Task 2 - Balanced",
+        "IELTS Task 2 - Band 7+",
+        "Academic Formal"
     ]
     
     var body: some View {
@@ -107,6 +119,10 @@ struct SettingsView: View {
             } else if !geminiAPIKey.isEmpty {
                 geminiAPIKeysText = geminiAPIKey
             }
+
+            UserDefaults.standard.set(advancedWritingEnabled, forKey: "smartFillAdvancedWritingEnabled")
+            UserDefaults.standard.set(writingPreset, forKey: "smartFillWritingPreset")
+            UserDefaults.standard.set(writingWordTarget, forKey: "smartFillWritingWordTarget")
         }
     }
     
@@ -264,6 +280,52 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.mini)
+            }
+
+            Divider()
+
+            // Writing Mode Advanced
+            Toggle(isOn: $advancedWritingEnabled) {
+                HStack {
+                    Text("Writing Mode chuyên sâu")
+                    Text("✍️")
+                    Spacer()
+                }
+            }
+            .toggleStyle(.switch)
+            .onChange(of: advancedWritingEnabled) { newValue in
+                UserDefaults.standard.set(newValue, forKey: "smartFillAdvancedWritingEnabled")
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Preset:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("", selection: $writingPreset) {
+                        ForEach(writingPresets, id: \.self) { preset in
+                            Text(preset).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .disabled(!advancedWritingEnabled)
+                    .onChange(of: writingPreset) { newValue in
+                        UserDefaults.standard.set(newValue, forKey: "smartFillWritingPreset")
+                    }
+                }
+
+                HStack {
+                    Text("Word target: \(writingWordTarget)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Stepper("", value: $writingWordTarget, in: 200...350, step: 5)
+                        .labelsHidden()
+                        .disabled(!advancedWritingEnabled)
+                        .onChange(of: writingWordTarget) { newValue in
+                            UserDefaults.standard.set(newValue, forKey: "smartFillWritingWordTarget")
+                        }
+                }
             }
             
             Divider()

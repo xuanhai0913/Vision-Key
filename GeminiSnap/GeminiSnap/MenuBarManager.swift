@@ -11,6 +11,11 @@ import AppKit
 import ApplicationServices
 
 class MenuBarManager: ObservableObject {
+    private enum SmartFillInputType {
+        case shortField
+        case longField
+    }
+
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var eventMonitor: Any?
@@ -34,6 +39,10 @@ class MenuBarManager: ObservableObject {
     private var lastCaptureRect: CGRect = .zero     // Vị trí capture trên màn hình
     private var lastOCRObservations: [OCRManager.TextObservation] = [] // OCR text với coordinates
     private var smartFillFocusedElement: AXUIElement?
+    private var smartFillFocusedRole: String?
+    private var smartFillFocusedExistingLength: Int = 0
+    private var smartFillTargetInputType: SmartFillInputType = .shortField
+    private var smartFillWritingModeEnabledForCapture: Bool = false
     private var smartFillSourceAppPID: pid_t?
     private var smartFillSourceBundleID: String?
     
@@ -431,6 +440,8 @@ class MenuBarManager: ObservableObject {
 
         // Capture focused input before user starts selecting capture region.
         smartFillFocusedElement = captureFocusedInputElement()
+        smartFillTargetInputType = inferSmartFillInputType()
+        smartFillWritingModeEnabledForCapture = shouldUseAdvancedWritingMode(for: smartFillTargetInputType)
         smartFillSourceAppPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         smartFillSourceBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
 
@@ -445,8 +456,7 @@ class MenuBarManager: ObservableObject {
                 guard let self = self else { return }
                 guard let image = image else {
                     self.smartFillFocusedElement = nil
-                    self.smartFillSourceAppPID = nil
-                    self.smartFillSourceBundleID = nil
+                    self.resetSmartFillCaptureContext()
                     return
                 }
 
@@ -455,7 +465,11 @@ class MenuBarManager: ObservableObject {
                 self.errorMessage = nil
                 self.isLoading = true
 
-                let prompt = self.buildSmartFillPrompt(language: AIServiceManager.shared.currentLanguage)
+                let prompt = self.buildSmartFillPrompt(
+                    language: AIServiceManager.shared.currentLanguage,
+                    targetInputType: self.smartFillTargetInputType,
+                    writingModeEnabled: self.smartFillWritingModeEnabledForCapture
+                )
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: prompt) { [weak self] result in
                     DispatchQueue.main.async {
@@ -475,7 +489,25 @@ class MenuBarManager: ObservableObject {
 
             if canRetry && isLikelyPromptEcho(fillText) {
                 isLoading = true
-                let retryPrompt = buildSmartFillRetryPrompt(language: AIServiceManager.shared.currentLanguage)
+                let retryPrompt = buildSmartFillRetryPrompt(
+                    language: AIServiceManager.shared.currentLanguage,
+                    writingModeEnabled: smartFillWritingModeEnabledForCapture
+                )
+
+                AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: retryPrompt) { [weak self] retryResult in
+                    DispatchQueue.main.async {
+                        self?.handleSmartFillResult(retryResult, image: image, canRetry: false)
+                    }
+                }
+                return
+            }
+
+            if canRetry && smartFillWritingModeEnabledForCapture && isLikelyIncompleteWriting(fillText) {
+                isLoading = true
+                let retryPrompt = buildSmartFillRetryPrompt(
+                    language: AIServiceManager.shared.currentLanguage,
+                    writingModeEnabled: true
+                )
 
                 AIServiceManager.shared.analyzeImageWithCustomPrompt(image, prompt: retryPrompt) { [weak self] retryResult in
                     DispatchQueue.main.async {
@@ -513,8 +545,7 @@ class MenuBarManager: ObservableObject {
             )
             FloatingAnswerPanel.shared.show(answer: popupText, autoDismissAfter: didAutoFill ? 2.5 : 6) { }
 
-            smartFillSourceAppPID = nil
-            smartFillSourceBundleID = nil
+            resetSmartFillCaptureContext()
 
             HistoryManager.shared.addItem(
                 provider: AIServiceManager.shared.currentProviderType.rawValue,
@@ -527,8 +558,7 @@ class MenuBarManager: ObservableObject {
 
         case .failure(let error):
             smartFillFocusedElement = nil
-            smartFillSourceAppPID = nil
-            smartFillSourceBundleID = nil
+            resetSmartFillCaptureContext()
             errorMessage = error.localizedDescription
 
             FloatingAnswerPanel.shared.show(
@@ -538,58 +568,216 @@ class MenuBarManager: ObservableObject {
         }
     }
 
-    private func buildSmartFillPrompt(language: ResponseLanguage) -> String {
+    private func buildSmartFillPrompt(
+        language: ResponseLanguage,
+        targetInputType: SmartFillInputType,
+        writingModeEnabled: Bool
+    ) -> String {
         let expertLine = expertContext.isEmpty ? "" : "Bối cảnh chuyên gia: \(expertContext)."
+        let targetGuide = targetInputType == .longField
+            ? "Đây là ô nhập dài (textarea)"
+            : "Đây là ô nhập ngắn (text field)"
 
         if language == .vietnamese {
+            if writingModeEnabled {
+                let (minWords, maxWords) = writingWordRange()
+                return """
+                \(expertLine)
+                \(targetGuide).
+                Bạn đang ở Writing Mode chuyên sâu. Hãy trả lời đúng đề trong ảnh, KHÔNG chép lại đề.
+
+                BẮT BUỘC:
+                - Viết bài hoàn chỉnh theo chuẩn \(writingPresetDescriptionVN()).
+                - Độ dài mục tiêu: \(minWords)-\(maxWords) từ.
+                - Có quan điểm cá nhân rõ ràng, luận điểm mạch lạc.
+                - Chỉ output nội dung để dán vào ô input.
+                - Không markdown, không bullet, không thêm nhãn.
+                """
+            }
+
+            if targetInputType == .shortField {
+                return """
+                \(expertLine)
+                \(targetGuide).
+                Đọc ảnh và trả lời đúng trọng tâm để điền vào ô ngắn.
+
+                BẮT BUỘC:
+                - Chỉ output nội dung cần dán.
+                - Tối đa 25 từ.
+                - Không markdown, không bullet, không giải thích.
+                - Không chép lại đề hoặc prompt trong ảnh.
+                """
+            }
+
             return """
             \(expertLine)
-            Bạn đang hỗ trợ người dùng điền ô input bằng nội dung đúng.
-            Nhiệm vụ: đọc ảnh và TRẢ LỜI bài/câu hỏi trong ảnh, KHÔNG chép lại đề bài.
+            \(targetGuide).
+            Đọc ảnh và trả lời đúng câu hỏi/task trong ảnh.
 
-            Yêu cầu bắt buộc:
-            - Chỉ trả về nội dung cần dán vào ô input.
-            - Không markdown, không bullet, không giải thích.
-            - Tuyệt đối không lặp lại nguyên văn đề hoặc prompt trong ảnh.
-            - Nếu là bài viết dạng essay / IELTS Writing Task 2: viết bài hoàn chỉnh 220-320 từ, có quan điểm cá nhân rõ ràng.
-            - Nếu là câu trả lời ngắn hoặc form field: trả lời đúng trọng tâm, ngắn gọn.
+            BẮT BUỘC:
+            - Chỉ output nội dung cần dán vào ô input.
+            - Trả lời mạch lạc trong 2-5 câu.
+            - Không markdown, không bullet, không giải thích meta.
+            - Không chép lại đề hoặc prompt trong ảnh.
+            """
+        }
+
+        if writingModeEnabled {
+            let (minWords, maxWords) = writingWordRange()
+            return """
+            \(expertLine)
+            \(targetGuide).
+            Writing Mode Advanced is enabled. Answer the writing prompt from the image, do NOT copy the prompt.
+
+            REQUIREMENTS:
+            - Write a complete essay aligned with \(writingPresetDescriptionEN()).
+            - Target length: \(minWords)-\(maxWords) words.
+            - Keep a clear personal stance and coherent argument.
+            - Output only paste-ready text.
+            - No markdown, no bullets, no labels.
+            """
+        }
+
+        if targetInputType == .shortField {
+            return """
+            \(expertLine)
+            \(targetGuide).
+            Read the image and provide the exact short answer to fill this field.
+
+            REQUIREMENTS:
+            - Output only paste-ready text.
+            - Max 25 words.
+            - No markdown, no bullets, no explanation.
+            - Do not copy the prompt text from the image.
             """
         }
 
         return """
         \(expertLine)
-        You are helping the user fill an input field with the correct answer.
-        Task: read the image and ANSWER the question/task shown, DO NOT copy the prompt text.
+        \(targetGuide).
+        Read the image and provide the exact answer content for this input.
 
-        Requirements:
-        - Return only the text that should be pasted into the input.
-        - No markdown, no bullets, no explanation.
-        - Never repeat the original prompt sentence from the image.
-        - If it is an essay / IELTS Writing Task 2: write a complete response in 220-320 words with a clear personal stance.
-        - If it is a short-answer field: keep it concise and focused.
+        REQUIREMENTS:
+        - Output only paste-ready text.
+        - Keep it coherent in 2-5 sentences.
+        - No markdown, no bullets, no meta explanation.
+        - Do not copy the prompt text from the image.
         """
     }
 
-    private func buildSmartFillRetryPrompt(language: ResponseLanguage) -> String {
+    private func buildSmartFillRetryPrompt(language: ResponseLanguage, writingModeEnabled: Bool) -> String {
         if language == .vietnamese {
-            return """
-            Câu trả lời trước đang bị chép lại đề bài. Hãy sửa lại.
+            if writingModeEnabled {
+                let (minWords, maxWords) = writingWordRange()
+                return """
+                Output trước chưa đạt yêu cầu Writing Mode. Viết lại.
 
-            Hãy trả về CÂU TRẢ LỜI để nộp, không được chép đề trong ảnh.
-            - Nếu là essay / IELTS Writing Task 2: viết bài hoàn chỉnh 220-320 từ.
-            - Nếu là câu ngắn: trả lời ngắn gọn, đúng trọng tâm.
-            - Không markdown, không bullet, không thêm nhãn.
+                BẮT BUỘC:
+                - Không chép đề trong ảnh.
+                - Viết bài hoàn chỉnh \(minWords)-\(maxWords) từ.
+                - Có quan điểm rõ ràng và luận điểm logic.
+                - Chỉ output nội dung để dán, không markdown, không nhãn.
+                """
+            }
+
+            return """
+            Output trước chưa đạt yêu cầu. Viết lại nội dung để dán vào ô input.
+
+            BẮT BUỘC:
+            - Không chép đề trong ảnh.
+            - Trả lời đúng trọng tâm.
+            - Chỉ output nội dung cần dán, không markdown, không nhãn.
+            """
+        }
+
+        if writingModeEnabled {
+            let (minWords, maxWords) = writingWordRange()
+            return """
+            The previous output did not satisfy Writing Mode requirements. Rewrite it.
+
+            REQUIREMENTS:
+            - Do not copy the prompt from the image.
+            - Write a complete essay of \(minWords)-\(maxWords) words.
+            - Keep a clear stance and coherent reasoning.
+            - Output only paste-ready text, no markdown or labels.
             """
         }
 
         return """
-        The previous output copied the prompt instead of answering.
+        The previous output did not satisfy the input-fill requirements. Rewrite it.
 
-        Return the actual response to submit, not the prompt text from the image.
-        - Essay / IELTS Writing Task 2: write a complete 220-320 word response.
-        - Short-answer field: concise and focused answer.
-        - No markdown, no bullets, no labels.
+        REQUIREMENTS:
+        - Do not copy the prompt from the image.
+        - Return only the final answer text to paste.
+        - No markdown, no labels, no explanations.
         """
+    }
+
+    private func shouldUseAdvancedWritingMode(for targetInputType: SmartFillInputType) -> Bool {
+        let enabled = UserDefaults.standard.object(forKey: "smartFillAdvancedWritingEnabled") as? Bool ?? true
+        guard enabled else {
+            return false
+        }
+
+        let context = expertContext.lowercased()
+        let writingHints = ["writing", "ielts", "toefl", "essay", "task 1", "task 2", "thi writing"]
+        let looksLikeWriting = writingHints.contains { context.contains($0) }
+
+        return looksLikeWriting && targetInputType == .longField
+    }
+
+    private func inferSmartFillInputType() -> SmartFillInputType {
+        if smartFillFocusedRole == kAXTextAreaRole as String {
+            return .longField
+        }
+
+        if smartFillFocusedExistingLength > 120 {
+            return .longField
+        }
+
+        return .shortField
+    }
+
+    private func writingPresetDescriptionVN() -> String {
+        switch UserDefaults.standard.string(forKey: "smartFillWritingPreset") ?? "IELTS Task 2 - Balanced" {
+        case "IELTS Task 2 - Band 7+":
+            return "IELTS Task 2 Band 7+ (lập luận sâu, từ vựng học thuật)"
+        case "Academic Formal":
+            return "Academic Formal (trang trọng, chính xác, giàu liên kết)"
+        default:
+            return "IELTS Task 2 Balanced (rõ ràng, tự nhiên, dễ dùng)"
+        }
+    }
+
+    private func writingPresetDescriptionEN() -> String {
+        switch UserDefaults.standard.string(forKey: "smartFillWritingPreset") ?? "IELTS Task 2 - Balanced" {
+        case "IELTS Task 2 - Band 7+":
+            return "IELTS Task 2 Band 7+ style (deeper argumentation, stronger academic vocabulary)"
+        case "Academic Formal":
+            return "Academic formal style (precise, cohesive, formal tone)"
+        default:
+            return "balanced IELTS Task 2 style (clear, natural, practical)"
+        }
+    }
+
+    private func writingWordRange() -> (Int, Int) {
+        let target = UserDefaults.standard.integer(forKey: "smartFillWritingWordTarget")
+        let normalizedTarget = target == 0 ? 260 : max(200, min(350, target))
+        let minWords = max(180, normalizedTarget - 25)
+        let maxWords = min(380, normalizedTarget + 25)
+        return (minWords, maxWords)
+    }
+
+    private func isLikelyIncompleteWriting(_ text: String) -> Bool {
+        let count = wordCount(text)
+        let (minWords, _) = writingWordRange()
+        return count < minWords
+    }
+
+    private func wordCount(_ text: String) -> Int {
+        text
+            .split { $0.isWhitespace || $0.isNewline }
+            .count
     }
 
     private func isLikelyPromptEcho(_ text: String) -> Bool {
@@ -634,6 +822,8 @@ class MenuBarManager: ObservableObject {
 
     private func captureFocusedInputElement() -> AXUIElement? {
         guard AXIsProcessTrusted() else {
+            smartFillFocusedRole = nil
+            smartFillFocusedExistingLength = 0
             return nil
         }
 
@@ -647,11 +837,50 @@ class MenuBarManager: ObservableObject {
         )
 
         guard status == .success, let focusedValue = focusedValue else {
+            smartFillFocusedRole = nil
+            smartFillFocusedExistingLength = 0
             return nil
         }
 
         let focusedElement = unsafeBitCast(focusedValue, to: AXUIElement.self)
-        return isEditableInputElement(focusedElement) ? focusedElement : nil
+        if isEditableInputElement(focusedElement) {
+            smartFillFocusedRole = roleString(for: focusedElement)
+            smartFillFocusedExistingLength = currentTextLength(for: focusedElement)
+            return focusedElement
+        }
+
+        smartFillFocusedRole = nil
+        smartFillFocusedExistingLength = 0
+        return nil
+    }
+
+    private func roleString(for element: AXUIElement) -> String {
+        var roleValue: CFTypeRef?
+        let roleStatus = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
+        guard roleStatus == .success else {
+            return ""
+        }
+        return roleValue as? String ?? ""
+    }
+
+    private func currentTextLength(for element: AXUIElement) -> Int {
+        var valueRef: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, kAXValueAttribute as CFString, &valueRef)
+        guard status == .success,
+              let value = valueRef as? String else {
+            return 0
+        }
+        return value.count
+    }
+
+    private func resetSmartFillCaptureContext() {
+        smartFillFocusedElement = nil
+        smartFillFocusedRole = nil
+        smartFillFocusedExistingLength = 0
+        smartFillTargetInputType = .shortField
+        smartFillWritingModeEnabledForCapture = false
+        smartFillSourceAppPID = nil
+        smartFillSourceBundleID = nil
     }
 
     private func isEditableInputElement(_ element: AXUIElement) -> Bool {

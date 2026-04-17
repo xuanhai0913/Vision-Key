@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     name: Build Vision-Key on Stable Cloud Mac
-    runs-on: macos-14
+    runs-on: macos-15
     permissions:
       contents: write
 
@@ -26,6 +26,7 @@ jobs:
           CODE_SIGN_IDENTITY="-" \
           CODE_SIGNING_REQUIRED=YES \
           CODE_SIGNING_ALLOWED=YES \
+          MACOSX_DEPLOYMENT_TARGET=13.0 \
           -derivedDataPath Build/
 
     - name: Ký & Xóa Quarantine

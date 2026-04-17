@@ -9,12 +9,14 @@ jobs:
   build:
     name: Build Vision-Key on Stable Cloud Mac
     runs-on: macos-14
+    permissions:
+      contents: write
 
     steps:
     - name: Lấy mã nguồn
       uses: actions/checkout@v4
 
-    - name: Biên dịch & Ký Ad-hoc (macOS chấp nhận)
+    - name: Biên dịch & Ký Ad-hoc
       run: |
         cd GeminiSnap
         xcodebuild \
@@ -26,24 +28,25 @@ jobs:
           CODE_SIGNING_ALLOWED=YES \
           -derivedDataPath Build/
 
-    - name: Xóa Quarantine & Xác nhận chữ ký
+    - name: Ký & Xóa Quarantine
       run: |
         APP_PATH="GeminiSnap/Build/Build/Products/Release/GeminiSnap.app"
-        # Ký ad-hoc toàn bộ app bundle
         codesign --force --deep --sign "-" "$APP_PATH"
-        # Xóa quarantine flag
         xattr -cr "$APP_PATH"
-        echo "✅ App signed and quarantine cleared"
-        codesign -dv "$APP_PATH"
+        echo "✅ Signed OK"
 
-    - name: Nén file App thành ZIP
+    - name: Nén bằng ditto (giữ metadata)
       run: |
         cd GeminiSnap/Build/Build/Products/Release/
-        ditto -c -k --sequesterRsrc --keepParent GeminiSnap.app GeminiSnap-CloudBuild.zip
+        ditto -c -k --sequesterRsrc --keepParent GeminiSnap.app GeminiSnap.zip
 
-    - name: Trả thành phẩm cho người dùng
-      uses: actions/upload-artifact@v3
-      with:
-        name: Vision-Key-App-Bypass
-        path: GeminiSnap/Build/Build/Products/Release/GeminiSnap-CloudBuild.zip
-        retention-days: 7
+    - name: Publish lên GitHub Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG="build-$(date +'%Y%m%d-%H%M%S')"
+        gh release create "$TAG" \
+          GeminiSnap/Build/Build/Products/Release/GeminiSnap.zip \
+          --title "Vision-Key Build $(date +'%Y-%m-%d %H:%M')" \
+          --notes "✅ Auto-built by GitHub Actions. Ad-hoc signed — mở được trên Mac không cần Apple Developer Account." \
+          --latest

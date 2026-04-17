@@ -3,7 +3,7 @@ name: Build macOS App (Cloud Compiler)
 on:
   push:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,15 +14,32 @@ jobs:
     - name: Lấy mã nguồn
       uses: actions/checkout@v4
 
-    - name: Biên dịch Ứng dụng (Tránh MDM Local)
+    - name: Biên dịch & Ký Ad-hoc (macOS chấp nhận)
       run: |
         cd GeminiSnap
-        xcodebuild -project GeminiSnap.xcodeproj -scheme GeminiSnap -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath Build/
+        xcodebuild \
+          -project GeminiSnap.xcodeproj \
+          -scheme GeminiSnap \
+          -configuration Release \
+          CODE_SIGN_IDENTITY="-" \
+          CODE_SIGNING_REQUIRED=YES \
+          CODE_SIGNING_ALLOWED=YES \
+          -derivedDataPath Build/
+
+    - name: Xóa Quarantine & Xác nhận chữ ký
+      run: |
+        APP_PATH="GeminiSnap/Build/Build/Products/Release/GeminiSnap.app"
+        # Ký ad-hoc toàn bộ app bundle
+        codesign --force --deep --sign "-" "$APP_PATH"
+        # Xóa quarantine flag
+        xattr -cr "$APP_PATH"
+        echo "✅ App signed and quarantine cleared"
+        codesign -dv "$APP_PATH"
 
     - name: Nén file App thành ZIP
       run: |
         cd GeminiSnap/Build/Build/Products/Release/
-        zip -r GeminiSnap-CloudBuild.zip GeminiSnap.app
+        ditto -c -k --sequesterRsrc --keepParent GeminiSnap.app GeminiSnap-CloudBuild.zip
 
     - name: Trả thành phẩm cho người dùng
       uses: actions/upload-artifact@v4

@@ -42,7 +42,8 @@ jobs:
         ditto -c -k --sequesterRsrc --keepParent GeminiSnap.app GeminiSnap-CloudBuild.zip
 
     - name: Trả thành phẩm cho người dùng
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: Vision-Key-App-Bypass
         path: GeminiSnap/Build/Build/Products/Release/GeminiSnap-CloudBuild.zip
+        retention-days: 7

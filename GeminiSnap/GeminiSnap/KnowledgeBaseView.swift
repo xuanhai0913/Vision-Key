@@ -380,24 +380,33 @@ struct KnowledgeBaseView: View {
     // MARK: - Actions
     
     private func openFilePicker() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [
-            .plainText, .pdf, .json, .commaSeparatedText,
-            .init(filenameExtension: "md")!
-        ]
-        panel.message = "Chọn tài liệu để thêm vào Knowledge Base"
-        panel.prompt = "Thêm"
-        
-        panel.begin { response in
+        // NSOpenPanel phải chạy trên main thread
+        DispatchQueue.main.async {
+            let panel = NSOpenPanel()
+            panel.allowsMultipleSelection = true
+            panel.canChooseDirectories = false
+            panel.allowedContentTypes = [
+                .plainText, .pdf, .json, .commaSeparatedText,
+                .init(filenameExtension: "md")!
+            ]
+            panel.message = "Chọn tài liệu để thêm vào Knowledge Base"
+            panel.prompt = "Thêm"
+            // Đưa panel lên trên tất cả window (bao gồm NSPanel/popover)
+            panel.level = .floating
+            
+            // runModal() đảm bảo panel hiện đúng dù được gọi từ NSPanel/floating window
+            let response = panel.runModal()
             guard response == .OK else { return }
             
-            for url in panel.urls {
-                do {
-                    try manager.addDocument(from: url)
-                } catch {
-                    errorMessage = error.localizedDescription
+            let selectedURLs = panel.urls
+            // Cập nhật UI state phải ở main thread
+            DispatchQueue.main.async {
+                for url in selectedURLs {
+                    do {
+                        try self.manager.addDocument(from: url)
+                    } catch {
+                        self.errorMessage = error.localizedDescription
+                    }
                 }
             }
         }
@@ -411,9 +420,9 @@ struct KnowledgeBaseView: View {
                 
                 DispatchQueue.main.async {
                     do {
-                        try manager.addDocument(from: url)
+                        try self.manager.addDocument(from: url)
                     } catch {
-                        errorMessage = error.localizedDescription
+                        self.errorMessage = error.localizedDescription
                     }
                 }
             }

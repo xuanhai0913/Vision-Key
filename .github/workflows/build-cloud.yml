@@ -1,0 +1,31 @@
+name: Build macOS App (Cloud Compiler)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Allows you to run this workflow manually from the Actions tab
+
+jobs:
+  build:
+    name: Build Vision-Key on Stable Cloud Mac
+    runs-on: macos-14
+
+    steps:
+    - name: Lấy mã nguồn
+      uses: actions/checkout@v4
+
+    - name: Biên dịch Ứng dụng (Tránh MDM Local)
+      run: |
+        cd GeminiSnap
+        xcodebuild -project GeminiSnap.xcodeproj -scheme GeminiSnap -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO -derivedDataPath Build/
+
+    - name: Nén file App thành ZIP
+      run: |
+        cd GeminiSnap/Build/Build/Products/Release/
+        zip -r GeminiSnap-CloudBuild.zip GeminiSnap.app
+
+    - name: Trả thành phẩm cho người dùng
+      uses: actions/upload-artifact@v4
+      with:
+        name: Vision-Key-App-Bypass
+        path: GeminiSnap/Build/Build/Products/Release/GeminiSnap-CloudBuild.zip

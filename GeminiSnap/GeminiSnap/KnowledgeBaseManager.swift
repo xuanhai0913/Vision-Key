@@ -130,11 +130,11 @@ enum KnowledgeBaseError: LocalizedError {
         case .contentExtractionFailed:
             return "Không thể đọc nội dung file"
         case .fileTooLarge(let size):
-            return "File quá lớn (\(size / 1024)KB). Giới hạn: 500KB/file"
+            return "File quá lớn (\(size / 1024)KB). Giới hạn: 2MB/file"
         case .documentLimitReached:
-            return "Đã đạt giới hạn 10 tài liệu"
+            return "Đã đạt giới hạn 20 tài liệu"
         case .totalSizeLimitReached:
-            return "Tổng dung lượng vượt giới hạn 200KB text"
+            return "Tổng dung lượng vượt giới hạn 1MB text"
         }
     }
 }
@@ -152,9 +152,9 @@ class KnowledgeBaseManager: ObservableObject {
     }
     @Published var lastError: String?
     
-    private let maxDocuments = 10
-    private let maxFileSize = 500 * 1024 // 500KB per file
-    private let maxTotalTextSize = 200 * 1024 // 200KB total text (~50K tokens)
+    private let maxDocuments = 20
+    private let maxFileSize = 2 * 1024 * 1024   // 2MB per file
+    private let maxTotalTextSize = 1024 * 1024  // 1MB total text (~250K tokens)
     
     private var storageURL: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!

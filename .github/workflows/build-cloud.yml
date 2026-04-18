@@ -29,12 +29,26 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET=13.0 \
           -derivedDataPath Build/
 
-    - name: Ký & Xóa Quarantine
+    - name: Ký với Designated Requirement ổn định (fix TCC permission)
       run: |
         APP_PATH="GeminiSnap/Build/Build/Products/Release/GeminiSnap.app"
-        codesign --force --deep --sign "-" "$APP_PATH"
+        BUNDLE_ID="com.geminisnap.app"
+        
+        # Ký với designated requirement cố định dựa trên Bundle ID
+        # Điều này đảm bảo macOS TCC nhận ra app qua các lần build khác nhau
+        codesign --force --deep \
+          --sign "-" \
+          --identifier "$BUNDLE_ID" \
+          --requirements "=designated => identifier \"$BUNDLE_ID\"" \
+          "$APP_PATH"
+        
+        # Xóa quarantine flag
         xattr -cr "$APP_PATH"
-        echo "✅ Signed OK"
+        
+        # Verify
+        echo "=== Code Signing Info ===" 
+        codesign -dv --verbose=4 "$APP_PATH" 2>&1 | grep -E "Identifier|designated|TeamID"
+        echo "✅ Signed with stable designated requirement"
 
     - name: Nén bằng ditto (giữ metadata)
       run: |

@@ -670,7 +670,6 @@ class MenuBarManager: ObservableObject {
             OUTPUT: Essay text only — no labels, no explanations. Paste-ready.
             """
         }
-        }
 
         return """
         The previous output did not satisfy the input-fill requirements. Rewrite it.

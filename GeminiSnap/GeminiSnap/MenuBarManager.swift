@@ -485,7 +485,10 @@ class MenuBarManager: ObservableObject {
 
         switch result {
         case .success(let text):
-            let fillText = normalizeSmartFillText(text)
+            let fillText = normalizeSmartFillText(
+                text,
+                preserveParagraphs: smartFillWritingModeEnabledForCapture
+            )
 
             if isLikelyPromptEcho(fillText) {
                 if retryStep >= 2 {
@@ -620,6 +623,7 @@ class MenuBarManager: ObservableObject {
             - Do NOT use: "In today's world", "In conclusion,", "To sum up,", "It is undeniable that", "plays a crucial role".
 
             TARGET: \(writingPresetDescriptionEN()) style, \(minWords)–\(maxWords) words.
+            FORMAT: Separate each paragraph with ONE blank line.
             OUTPUT: Only the essay text — no labels, no headings, no explanations. Paste-ready.
             """
         }
@@ -667,6 +671,7 @@ class MenuBarManager: ObservableObject {
             STYLE: Sound like a real student. Vary sentence length. Use direct opinion ("I believe", "From my experience").
             AVOID: "In today's world", "In conclusion", "It is undeniable", "plays a crucial role", bullet points, headings.
             TARGET: \(writingPresetDescriptionEN()), \(minWords)–\(maxWords) words.
+            FORMAT: Separate each paragraph with ONE blank line.
             OUTPUT: Essay text only — no labels, no explanations. Paste-ready.
             """
         }
@@ -699,6 +704,7 @@ class MenuBarManager: ObservableObject {
                 - Viết BÀI TRẢ LỜI hoàn chỉnh \(minWords)-\(maxWords) từ.
                 - Tuyệt đối KHÔNG được sao chép nguyên văn câu nào từ đề bài phía trên.
                 - Phải diễn đạt lại bằng lời văn của bạn, có quan điểm cá nhân rõ ràng.
+                - Mỗi đoạn phải cách nhau đúng 1 dòng trống.
                 - Chỉ output bài trả lời để dán vào ô input.
                 """
             }
@@ -724,6 +730,7 @@ class MenuBarManager: ObservableObject {
             - Write a complete response of \(minWords)-\(maxWords) words.
             - Do NOT copy any full sentence from the prompt above.
             - Paraphrase the task and provide a clear personal stance.
+            - Separate each paragraph with ONE blank line.
             - Output only the final response text for pasting.
             """
         }
@@ -982,16 +989,26 @@ class MenuBarManager: ObservableObject {
         return targetApp != nil
     }
 
-    private func normalizeSmartFillText(_ text: String) -> String {
+    private func normalizeSmartFillText(_ text: String, preserveParagraphs: Bool = false) -> String {
         var cleaned = text
             .replacingOccurrences(of: "FINAL_ANSWER:", with: "", options: .caseInsensitive)
             .replacingOccurrences(of: "`", with: "")
-            .replacingOccurrences(of: "\\r", with: "")
+            .replacingOccurrences(of: "\\r\\n", with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "\\r", with: "\n", options: .regularExpression)
 
-        cleaned = cleaned
-            .replacingOccurrences(of: "\\n+", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if preserveParagraphs {
+            cleaned = cleaned
+                .replacingOccurrences(of: "[ \t]+\\n", with: "\n", options: .regularExpression)
+                .replacingOccurrences(of: "\\n{3,}", with: "\n\n", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            cleaned = formatWritingParagraphs(cleaned)
+        } else {
+            cleaned = cleaned
+                .replacingOccurrences(of: "\\n+", with: " ", options: .regularExpression)
+                .replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
 
         let removablePrefixes = ["Đề bài:", "Đề:", "Prompt:", "Question:"]
         for prefix in removablePrefixes where cleaned.hasPrefix(prefix) {
@@ -1009,6 +1026,67 @@ class MenuBarManager: ObservableObject {
         }
 
         return cleaned
+    }
+
+    private func formatWritingParagraphs(_ text: String) -> String {
+        // If the model already returned paragraphs, only normalize spacing.
+        let existingParagraphs = text
+            .components(separatedBy: "\n\n")
+            .map { paragraph in
+                paragraph
+                    .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+
+        if existingParagraphs.count >= 2 {
+            return existingParagraphs.joined(separator: "\n\n")
+        }
+
+        let singleLine = text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let sentenceRegex = try? NSRegularExpression(pattern: "[^.!?]+[.!?]+(?:['\"”’)]*)|[^.!?]+$", options: []) else {
+            return singleLine
+        }
+
+        let sentenceMatches = sentenceRegex.matches(
+            in: singleLine,
+            range: NSRange(singleLine.startIndex..., in: singleLine)
+        )
+
+        let sentences = sentenceMatches.compactMap { match -> String? in
+            guard let range = Range(match.range, in: singleLine) else { return nil }
+            let sentence = String(singleLine[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return sentence.isEmpty ? nil : sentence
+        }
+
+        // Too short to reliably split into essay paragraphs.
+        guard sentences.count >= 6 else {
+            return singleLine
+        }
+
+        let total = sentences.count
+        let introCount = min(3, max(2, total / 6))
+        let conclusionCount = min(3, max(2, total / 6))
+        let bodyTotal = max(0, total - introCount - conclusionCount)
+
+        let body1Count = bodyTotal / 2
+        let body2Count = bodyTotal - body1Count
+
+        let introEnd = introCount
+        let body1End = introEnd + body1Count
+        let body2End = body1End + body2Count
+
+        let intro = sentences[0..<introEnd].joined(separator: " ")
+        let body1 = sentences[introEnd..<body1End].joined(separator: " ")
+        let body2 = sentences[body1End..<body2End].joined(separator: " ")
+        let conclusion = sentences[body2End..<total].joined(separator: " ")
+
+        return [intro, body1, body2, conclusion]
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
     }
 
     private func buildSmartFillPopupText(

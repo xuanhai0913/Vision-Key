@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     name: Build Vision-Key on Stable Cloud Mac
-    runs-on: macos-15
+    runs-on: macos-14
     permissions:
       contents: write
 
@@ -16,18 +16,39 @@ jobs:
     - name: Lấy mã nguồn
       uses: actions/checkout@v4
 
-    - name: Biên dịch & Ký Ad-hoc
+    - name: Chọn Xcode ổn định
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: "15.4"
+
+    - name: Biên dịch Release (không ký ở bước build)
       run: |
+        set -o pipefail
         cd GeminiSnap
+        set +e
         xcodebuild \
           -project GeminiSnap.xcodeproj \
           -scheme GeminiSnap \
           -configuration Release \
+          -destination 'platform=macOS' \
+          CODE_SIGN_STYLE=Manual \
           CODE_SIGN_IDENTITY="-" \
-          CODE_SIGNING_REQUIRED=YES \
-          CODE_SIGNING_ALLOWED=YES \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          ENABLE_PREVIEWS=NO \
+          ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS=NO \
           MACOSX_DEPLOYMENT_TARGET=13.0 \
-          -derivedDataPath Build/
+          -derivedDataPath Build/ \
+          | tee xcodebuild.log
+        BUILD_STATUS=${PIPESTATUS[0]}
+        set -e
+
+        # In lỗi quan trọng nếu build fail để dễ debug trên Actions
+        if [ "$BUILD_STATUS" -ne 0 ]; then
+          echo "=== xcodebuild errors ==="
+          grep -nE "error:|\*\* BUILD FAILED \*\*|SwiftCompile|CompileSwift" xcodebuild.log | head -n 200 || true
+          exit "$BUILD_STATUS"
+        fi
 
     - name: Ký với Designated Requirement ổn định (fix TCC permission)
       run: |

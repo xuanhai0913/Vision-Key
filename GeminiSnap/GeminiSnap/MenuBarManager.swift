@@ -598,91 +598,29 @@ class MenuBarManager: ObservableObject {
             ? "Đây là ô nhập dài (textarea)"
             : "Đây là ô nhập ngắn (text field)"
 
-        if language == .vietnamese {
-            if writingModeEnabled {
-                let (minWords, maxWords) = writingWordRange()
-                return """
-                \(expertLine)
-                \(targetGuide).
-                Bạn đang ở Writing Mode chuyên sâu. Đọc đề bài trong ảnh và viết bài hoàn chỉnh theo cấu trúc sau.
-                KHÔNG chép lại đề bài. KHÔNG thêm giải thích nào ngoài bài viết.
-
-                CẤU TRÚC BẮT BUỘC (giữ nguyên nhãn section để người dùng dễ chỉnh sửa):
-
-                [Mở bài]
-                -Câu dẫn dắt topic-. -Nêu quan điểm/luận đề chính của bài-.
-
-                [Thân bài 1]
-                -Luận điểm chính 1-. -Câu giải thích/phân tích-. -Ví dụ minh chứng cụ thể-. -Câu chuyển ý-.
-
-                [Thân bài 2]
-                -Luận điểm chính 2-. -Câu giải thích/phân tích-. -Ví dụ minh chứng cụ thể-. -Câu chuyển sang kết-.
-
-                [Kết bài]
-                -Tóm tắt lại luận đề-. -Nhận xét/khuyến nghị cuối cùng-.
-
-                YÊU CẦU:
-                - Thay thế tất cả phần -trong dấu gạch- bằng nội dung thực tế phù hợp với đề.
-                - Chuẩn \(writingPresetDescriptionVN()), \(minWords)-\(maxWords) từ.
-                - Giữ nguyên nhãn [Mở bài], [Thân bài 1], [Thân bài 2], [Kết bài] trong output.
-                - Không thêm bất kỳ nội dung nào ngoài 4 section trên.
-                """
-            }
-
-            if targetInputType == .shortField {
-                return """
-                \(expertLine)
-                \(targetGuide).
-                Đọc ảnh và trả lời đúng trọng tâm để điền vào ô ngắn.
-
-                BẮT BUỘC:
-                - Chỉ output nội dung cần dán.
-                - Tối đa 25 từ.
-                - Không markdown, không bullet, không giải thích.
-                - Không chép lại đề hoặc prompt trong ảnh.
-                """
-            }
-
-            return """
-            \(expertLine)
-            \(targetGuide).
-            Đọc ảnh và trả lời đúng câu hỏi/task trong ảnh.
-
-            BẮT BUỘC:
-            - Chỉ output nội dung cần dán vào ô input.
-            - Trả lời mạch lạc trong 2-5 câu.
-            - Không markdown, không bullet, không giải thích meta.
-            - Không chép lại đề hoặc prompt trong ảnh.
-            """
-        }
-
+        // Writing mode: always use English-only prompt for best quality output
         if writingModeEnabled {
             let (minWords, maxWords) = writingWordRange()
+            let expertHint = expertContext.isEmpty ? "" : "The writer's background/context: \(expertContext). "
             return """
-            \(expertLine)
-            \(targetGuide).
-            Writing Mode Advanced is enabled. Read the essay question from the image and write a complete structured essay.
-            Do NOT copy the question. Do NOT add any explanation outside the essay.
+            \(expertHint)You are a skilled human essay writer. Read the essay question from the image carefully and write a complete, well-structured essay in ENGLISH.
 
-            REQUIRED STRUCTURE (keep section labels so the user can easily edit):
+            ESSAY STRUCTURE — write 4 natural paragraphs in this order, NO labels or headings:
+            1. Introduction (2–3 sentences): Open with a natural, engaging observation about the topic. End with a clear personal stance.
+            2. First body paragraph (4–5 sentences): Your strongest argument. Support it with a specific real-world example or personal reasoning. Flow naturally.
+            3. Second body paragraph (4–5 sentences): A second angle or counter-argument addressed. Ground it with another concrete example.
+            4. Conclusion (2–3 sentences): Restate your view in fresh words. Close with a thoughtful final remark — not a generic summary.
 
-            [Introduction]
-            -Hook sentence related to the topic-. -Clear thesis statement with your position-.
+            WRITING STYLE — make it sound like a real student, NOT an AI:
+            - Vary sentence length: mix short punchy sentences with longer analytical ones.
+            - Use natural transitions: "That said,", "What's interesting is", "To put it simply," instead of "Furthermore," "In addition," "It is worth noting that".
+            - Express opinion directly: "I firmly believe", "From my perspective", "I've come to think" — not "It can be argued that".
+            - Include one specific real example (a country, study, or everyday scenario) to ground the argument.
+            - Avoid starting sentences with "The" three times in a row. Avoid passive voice when active sounds more natural.
+            - Do NOT use: "In today's world", "In conclusion,", "To sum up,", "It is undeniable that", "plays a crucial role".
 
-            [Body Paragraph 1]
-            -Topic sentence for argument 1-. -Explanation and analysis-. -Specific example or evidence-. -Transition sentence-.
-
-            [Body Paragraph 2]
-            -Topic sentence for argument 2-. -Explanation and analysis-. -Specific example or evidence-. -Link to conclusion-.
-
-            [Conclusion]
-            -Restate the thesis in different words-. -Final recommendation or broader implication-.
-
-            REQUIREMENTS:
-            - Replace ALL -placeholder text- with real content matching the essay question.
-            - Follow \(writingPresetDescriptionEN()) style, \(minWords)-\(maxWords) words.
-            - Keep labels [Introduction], [Body Paragraph 1], [Body Paragraph 2], [Conclusion] in output.
-            - Output nothing outside the 4 sections above.
+            TARGET: \(writingPresetDescriptionEN()) style, \(minWords)–\(maxWords) words.
+            OUTPUT: Only the essay text — no labels, no headings, no explanations. Paste-ready.
             """
         }
 
@@ -714,43 +652,24 @@ class MenuBarManager: ObservableObject {
     }
 
     private func buildSmartFillRetryPrompt(language: ResponseLanguage, writingModeEnabled: Bool) -> String {
-        if language == .vietnamese {
-            if writingModeEnabled {
-                let (minWords, maxWords) = writingWordRange()
-                return """
-                Output trước chưa đạt yêu cầu Writing Mode. Viết lại đúng cấu trúc.
-
-                BẮT BUỘC:
-                - Không chép đề trong ảnh.
-                - Viết bài hoàn chỉnh \(minWords)-\(maxWords) từ.
-                - Giữ nguyên cấu trúc 4 phần: [Mở bài] / [Thân bài 1] / [Thân bài 2] / [Kết bài].
-                - Mỗi phần viết nội dung thực, không để -placeholder- trống.
-                - Không thêm nội dung nào ngoài 4 section.
-                """
-            }
-
-            return """
-            Output trước chưa đạt yêu cầu. Viết lại nội dung để dán vào ô input.
-
-            BẮT BUỘC:
-            - Không chép đề trong ảnh.
-            - Trả lời đúng trọng tâm.
-            - Chỉ output nội dung cần dán, không markdown, không nhãn.
-            """
-        }
-
+        // Writing mode retry: always English for consistency
         if writingModeEnabled {
             let (minWords, maxWords) = writingWordRange()
             return """
-            The previous output did not satisfy Writing Mode requirements. Rewrite with correct structure.
+            The previous attempt did not meet essay quality standards. Rewrite the full essay from scratch.
 
-            REQUIREMENTS:
-            - Do not copy the prompt from the image.
-            - Write a complete essay of \(minWords)-\(maxWords) words.
-            - Keep the 4-section structure: [Introduction] / [Body Paragraph 1] / [Body Paragraph 2] / [Conclusion].
-            - Replace all -placeholder- with real content. Do not leave any placeholder empty.
-            - Output nothing outside the 4 sections.
+            ESSAY STRUCTURE — 4 natural paragraphs, NO labels or headings:
+            1. Introduction (2–3 sentences): Hook + clear personal stance.
+            2. First body paragraph (4–5 sentences): Strongest argument with a real example.
+            3. Second body paragraph (4–5 sentences): Second angle with a concrete example.
+            4. Conclusion (2–3 sentences): Fresh restatement + thoughtful closing remark.
+
+            STYLE: Sound like a real student. Vary sentence length. Use direct opinion ("I believe", "From my experience").
+            AVOID: "In today's world", "In conclusion", "It is undeniable", "plays a crucial role", bullet points, headings.
+            TARGET: \(writingPresetDescriptionEN()), \(minWords)–\(maxWords) words.
+            OUTPUT: Essay text only — no labels, no explanations. Paste-ready.
             """
+        }
         }
 
         return """

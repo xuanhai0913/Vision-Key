@@ -604,14 +604,28 @@ class MenuBarManager: ObservableObject {
                 return """
                 \(expertLine)
                 \(targetGuide).
-                Bạn đang ở Writing Mode chuyên sâu. Hãy trả lời đúng đề trong ảnh, KHÔNG chép lại đề.
+                Bạn đang ở Writing Mode chuyên sâu. Đọc đề bài trong ảnh và viết bài hoàn chỉnh theo cấu trúc sau.
+                KHÔNG chép lại đề bài. KHÔNG thêm giải thích nào ngoài bài viết.
 
-                BẮT BUỘC:
-                - Viết bài hoàn chỉnh theo chuẩn \(writingPresetDescriptionVN()).
-                - Độ dài mục tiêu: \(minWords)-\(maxWords) từ.
-                - Có quan điểm cá nhân rõ ràng, luận điểm mạch lạc.
-                - Chỉ output nội dung để dán vào ô input.
-                - Không markdown, không bullet, không thêm nhãn.
+                CẤU TRÚC BẮT BUỘC (giữ nguyên nhãn section để người dùng dễ chỉnh sửa):
+
+                [Mở bài]
+                -Câu dẫn dắt topic-. -Nêu quan điểm/luận đề chính của bài-.
+
+                [Thân bài 1]
+                -Luận điểm chính 1-. -Câu giải thích/phân tích-. -Ví dụ minh chứng cụ thể-. -Câu chuyển ý-.
+
+                [Thân bài 2]
+                -Luận điểm chính 2-. -Câu giải thích/phân tích-. -Ví dụ minh chứng cụ thể-. -Câu chuyển sang kết-.
+
+                [Kết bài]
+                -Tóm tắt lại luận đề-. -Nhận xét/khuyến nghị cuối cùng-.
+
+                YÊU CẦU:
+                - Thay thế tất cả phần -trong dấu gạch- bằng nội dung thực tế phù hợp với đề.
+                - Chuẩn \(writingPresetDescriptionVN()), \(minWords)-\(maxWords) từ.
+                - Giữ nguyên nhãn [Mở bài], [Thân bài 1], [Thân bài 2], [Kết bài] trong output.
+                - Không thêm bất kỳ nội dung nào ngoài 4 section trên.
                 """
             }
 
@@ -647,14 +661,28 @@ class MenuBarManager: ObservableObject {
             return """
             \(expertLine)
             \(targetGuide).
-            Writing Mode Advanced is enabled. Answer the writing prompt from the image, do NOT copy the prompt.
+            Writing Mode Advanced is enabled. Read the essay question from the image and write a complete structured essay.
+            Do NOT copy the question. Do NOT add any explanation outside the essay.
+
+            REQUIRED STRUCTURE (keep section labels so the user can easily edit):
+
+            [Introduction]
+            -Hook sentence related to the topic-. -Clear thesis statement with your position-.
+
+            [Body Paragraph 1]
+            -Topic sentence for argument 1-. -Explanation and analysis-. -Specific example or evidence-. -Transition sentence-.
+
+            [Body Paragraph 2]
+            -Topic sentence for argument 2-. -Explanation and analysis-. -Specific example or evidence-. -Link to conclusion-.
+
+            [Conclusion]
+            -Restate the thesis in different words-. -Final recommendation or broader implication-.
 
             REQUIREMENTS:
-            - Write a complete essay aligned with \(writingPresetDescriptionEN()).
-            - Target length: \(minWords)-\(maxWords) words.
-            - Keep a clear personal stance and coherent argument.
-            - Output only paste-ready text.
-            - No markdown, no bullets, no labels.
+            - Replace ALL -placeholder text- with real content matching the essay question.
+            - Follow \(writingPresetDescriptionEN()) style, \(minWords)-\(maxWords) words.
+            - Keep labels [Introduction], [Body Paragraph 1], [Body Paragraph 2], [Conclusion] in output.
+            - Output nothing outside the 4 sections above.
             """
         }
 
@@ -690,13 +718,14 @@ class MenuBarManager: ObservableObject {
             if writingModeEnabled {
                 let (minWords, maxWords) = writingWordRange()
                 return """
-                Output trước chưa đạt yêu cầu Writing Mode. Viết lại.
+                Output trước chưa đạt yêu cầu Writing Mode. Viết lại đúng cấu trúc.
 
                 BẮT BUỘC:
                 - Không chép đề trong ảnh.
                 - Viết bài hoàn chỉnh \(minWords)-\(maxWords) từ.
-                - Có quan điểm rõ ràng và luận điểm logic.
-                - Chỉ output nội dung để dán, không markdown, không nhãn.
+                - Giữ nguyên cấu trúc 4 phần: [Mở bài] / [Thân bài 1] / [Thân bài 2] / [Kết bài].
+                - Mỗi phần viết nội dung thực, không để -placeholder- trống.
+                - Không thêm nội dung nào ngoài 4 section.
                 """
             }
 
@@ -713,13 +742,14 @@ class MenuBarManager: ObservableObject {
         if writingModeEnabled {
             let (minWords, maxWords) = writingWordRange()
             return """
-            The previous output did not satisfy Writing Mode requirements. Rewrite it.
+            The previous output did not satisfy Writing Mode requirements. Rewrite with correct structure.
 
             REQUIREMENTS:
             - Do not copy the prompt from the image.
             - Write a complete essay of \(minWords)-\(maxWords) words.
-            - Keep a clear stance and coherent reasoning.
-            - Output only paste-ready text, no markdown or labels.
+            - Keep the 4-section structure: [Introduction] / [Body Paragraph 1] / [Body Paragraph 2] / [Conclusion].
+            - Replace all -placeholder- with real content. Do not leave any placeholder empty.
+            - Output nothing outside the 4 sections.
             """
         }
 

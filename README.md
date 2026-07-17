@@ -4,7 +4,7 @@
 
 ![Vision Key Logo](https://img.shields.io/badge/Vision_Key-AI_Screen_Assistant-purple?style=for-the-badge&logo=apple)
 
-<a href="https://www.hailamdev.space/">
+<a href="https://my-portfolio-nxh.vercel.app/">
   <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001214/Logo_st3nmr.png" width="90%" alt="Vision Key Logo" />
 </a>
 
@@ -157,7 +157,7 @@ MIT License - Xem file [LICENSE](LICENSE) để biết thêm chi tiết.
 
 ## 👨‍💻 Tác giả
 <div align="center">
-  <a href="https://www.hailamdev.space/">
+  <a href="https://my-portfolio-nxh.vercel.app/">
     <img src="https://res.cloudinary.com/dqdcqtu8m/image/upload/v1765001229/Icon_y7wrcf.png" width="40%" alt="Vision Key Demo" />
   </a>
   

@@ -36,20 +36,18 @@ struct SettingsView: View {
     @State private var isTestingKeyPool = false
     @State private var keyHealthResults: [String: APIKeyHealthStatus] = [:]
     @State private var testedKeys: [String] = []
+    @State private var availableModels: [AIModel] = []
+    @State private var isLoadingModels = false
+    @State private var modelLoadMessage: String?
     @State private var advancedWritingEnabled: Bool = UserDefaults.standard.object(forKey: "smartFillAdvancedWritingEnabled") as? Bool ?? true
     @State private var writingPreset: String = UserDefaults.standard.string(forKey: "smartFillWritingPreset") ?? "IELTS Task 2 - Balanced"
     @State private var writingWordTarget: Int = {
         let value = UserDefaults.standard.integer(forKey: "smartFillWritingWordTarget")
         return value == 0 ? 260 : value
     }()
-    @State private var selectedModel: String = UserDefaults.standard.string(forKey: "gemini_selectedModel") ?? "gemini-2.0-flash"
-    
-    private let geminiModels = [
-        "gemini-2.5-flash",
-        "gemini-2.0-flash", 
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
-    ]
+    @State private var selectedModel: String = UserDefaults.standard.string(forKey: "selectedModel_Gemini")
+        ?? UserDefaults.standard.string(forKey: "gemini_selectedModel")
+        ?? GeminiProvider().defaultModel
 
     private let writingPresets = [
         "IELTS Task 2 - Balanced",
@@ -123,6 +121,10 @@ struct SettingsView: View {
             UserDefaults.standard.set(advancedWritingEnabled, forKey: "smartFillAdvancedWritingEnabled")
             UserDefaults.standard.set(writingPreset, forKey: "smartFillWritingPreset")
             UserDefaults.standard.set(writingWordTarget, forKey: "smartFillWritingWordTarget")
+
+            if !geminiAPIKey.isEmpty {
+                loadAvailableModels(apiKey: geminiAPIKey)
+            }
         }
     }
     
@@ -221,14 +223,37 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Picker("", selection: $selectedModel) {
-                    ForEach(geminiModels, id: \.self) { model in
-                        Text(model).tag(model)
+                    if availableModels.isEmpty {
+                        Text(selectedModel).tag(selectedModel)
+                    } else {
+                        ForEach(availableModels) { model in
+                            Text(model.name).tag(model.id)
+                        }
                     }
                 }
                 .pickerStyle(.menu)
+                .disabled(isLoadingModels || availableModels.isEmpty)
                 .onChange(of: selectedModel) { newValue in
-                    UserDefaults.standard.set(newValue, forKey: "gemini_selectedModel")
+                    UserDefaults.standard.set(newValue, forKey: "selectedModel_Gemini")
                 }
+
+                if isLoadingModels {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Button(action: { loadAvailableModels(apiKey: geminiAPIKey) }) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Tải lại danh sách model")
+                    .disabled(geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+
+            if let modelLoadMessage {
+                Text(modelLoadMessage)
+                    .font(.caption2)
+                    .foregroundColor(availableModels.isEmpty ? .red : .secondary)
             }
             
             Link("Lấy API Key →", destination: URL(string: "https://aistudio.google.com/apikey")!)
@@ -416,8 +441,53 @@ struct SettingsView: View {
                 geminiAPIKeysText = geminiAPIKey
                 _ = KeychainHelper.saveAPIKeyPool([geminiAPIKey], forKey: KeychainHelper.geminiKey)
             }
+
+            loadAvailableModels(apiKey: geminiAPIKey)
         } else {
             validationMessage = "✗ Lỗi khi lưu"
+        }
+    }
+
+    private func loadAvailableModels(apiKey: String) {
+        let trimmedKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedKey.isEmpty else {
+            availableModels = []
+            modelLoadMessage = "Nhập API key để tải danh sách model"
+            return
+        }
+
+        isLoadingModels = true
+        modelLoadMessage = "Đang tải model được API key hỗ trợ..."
+
+        GeminiProvider().validateAndFetchModels(apiKey: trimmedKey) { result in
+            DispatchQueue.main.async {
+                self.isLoadingModels = false
+
+                switch result {
+                case .success(let models):
+                    self.availableModels = models
+
+                    guard !models.isEmpty else {
+                        self.modelLoadMessage = "API key không có model hỗ trợ generateContent"
+                        return
+                    }
+
+                    if !models.contains(where: { $0.id == self.selectedModel }) {
+                        let preferredModel = models.first(where: { $0.id == GeminiProvider().defaultModel }) ?? models[0]
+                        self.selectedModel = preferredModel.id
+                    }
+
+                    // Keep Settings and AIServiceManager on the same storage key,
+                    // including migration from the legacy gemini_selectedModel key.
+                    UserDefaults.standard.set(self.selectedModel, forKey: "selectedModel_Gemini")
+
+                    self.modelLoadMessage = "Đã tải \(models.count) model từ Gemini API"
+
+                case .failure(let error):
+                    self.availableModels = []
+                    self.modelLoadMessage = "Không tải được model: \(error.localizedDescription)"
+                }
+            }
         }
     }
 
@@ -534,6 +604,7 @@ struct SettingsView: View {
             _ = KeychainHelper.saveAPIKey(keys[0], forKey: "gemini_api_key")
             _ = KeychainHelper.saveAPIKey(keys[0], forKey: "GeminiAPIKey")
             validationMessage = "✓ Đã lưu \(keys.count) API keys (xoay vòng)"
+            loadAvailableModels(apiKey: keys[0])
         } else {
             validationMessage = "✗ Lỗi khi lưu key pool"
         }

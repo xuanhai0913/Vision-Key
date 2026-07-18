@@ -308,8 +308,8 @@ class MenuBarManager: ObservableObject {
                 let savedMode = self.answerMode
                 self.answerMode = .tracNghiem
                 
-                // Use fastest model
-                self.analyzeImageWithFastestModel(image) { [weak self] result in
+                // Use the model selected from the API-provided model list.
+                self.analyzeImageForInstantMode(image) { [weak self] result in
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         self.isLoading = false
@@ -351,7 +351,7 @@ class MenuBarManager: ObservableObject {
                             // Save to history
                             HistoryManager.shared.addItem(
                                 provider: "Instant",
-                                model: "flash",
+                                model: AIServiceManager.shared.currentModel,
                                 mode: AnswerMode.tracNghiem.rawValue,
                                 expertContext: nil,
                                 answer: answer,
@@ -374,16 +374,8 @@ class MenuBarManager: ObservableObject {
         }
     }
     
-    /// Analyze image with fastest available model
-    private func analyzeImageWithFastestModel(_ image: NSImage, completion: @escaping (Result<String, APIError>) -> Void) {
-        // Priority: Gemini flash models (fastest with vision support)
-        let fastModels = [
-            ("gemini-2.5-flash", AIProviderType.gemini),
-            ("gemini-2.0-flash", AIProviderType.gemini),
-            ("gemini-flash-latest", AIProviderType.gemini),
-            ("gpt-4o-mini", AIProviderType.openai)
-        ]
-        
+    /// Analyze an instant quiz using the provider and API-supported model selected in Settings.
+    private func analyzeImageForInstantMode(_ image: NSImage, completion: @escaping (Result<String, APIError>) -> Void) {
         // Check if Knowledge Base is enabled
         let knowledgeContext = KnowledgeBaseManager.shared.isEnabled 
             ? KnowledgeBaseManager.shared.buildContextPrompt() 
@@ -411,19 +403,9 @@ class MenuBarManager: ObservableObject {
         QUAN TRỌNG: Chỉ output đáp án, không viết gì khác.
         """
         
-        // Find first available fast model
-        for (modelId, providerType) in fastModels {
-            if let apiKey = AIServiceManager.shared.nextAPIKey(for: providerType), !apiKey.isEmpty {
-                providerType.provider.analyzeImage(image, apiKey: apiKey, model: modelId, prompt: instantPrompt, completion: completion)
-                return
-            }
-        }
-        
-        // Fallback to current provider with standard prompt
-        AIServiceManager.shared.analyzeImage(
+        AIServiceManager.shared.analyzeImageWithCustomPrompt(
             image,
-            mode: .tracNghiem,
-            expertContext: expertContext.isEmpty ? nil : expertContext,
+            prompt: instantPrompt,
             completion: completion
         )
     }

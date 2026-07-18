@@ -266,7 +266,27 @@ class GeminiProvider: AIProvider {
     }
     
     func validateAndFetchModels(apiKey: String, completion: @escaping (Result<[AIModel], APIError>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/models?key=\(apiKey)") else {
+        fetchAvailableModels(apiKey: apiKey, pageToken: nil, accumulatedModels: [], completion: completion)
+    }
+
+    private func fetchAvailableModels(
+        apiKey: String,
+        pageToken: String?,
+        accumulatedModels: [AIModel],
+        completion: @escaping (Result<[AIModel], APIError>) -> Void
+    ) {
+        guard var components = URLComponents(string: "\(baseURL)/models") else {
+            completion(.failure(.invalidURL))
+            return
+        }
+
+        var queryItems = [URLQueryItem(name: "key", value: apiKey)]
+        if let pageToken, !pageToken.isEmpty {
+            queryItems.append(URLQueryItem(name: "pageToken", value: pageToken))
+        }
+        components.queryItems = queryItems
+
+        guard let url = components.url else {
             completion(.failure(.invalidURL))
             return
         }
@@ -292,13 +312,28 @@ class GeminiProvider: AIProvider {
                         let aiModels = models.compactMap { model -> AIModel? in
                             guard let name = model["name"] as? String else { return nil }
                             let modelId = name.replacingOccurrences(of: "models/", with: "")
+                            let displayName = model["displayName"] as? String
                             let supportedMethods = model["supportedGenerationMethods"] as? [String] ?? []
                             if modelId.contains("gemini") && supportedMethods.contains("generateContent") {
-                                return AIModel(id: modelId, supportsVision: true)
+                                return AIModel(id: modelId, name: displayName, supportsVision: true)
                             }
                             return nil
-                        }.sorted { $0.id > $1.id }
-                        completion(.success(aiModels))
+                        }
+
+                        let allModels = accumulatedModels + aiModels
+                        if let nextPageToken = json["nextPageToken"] as? String, !nextPageToken.isEmpty {
+                            self.fetchAvailableModels(
+                                apiKey: apiKey,
+                                pageToken: nextPageToken,
+                                accumulatedModels: allModels,
+                                completion: completion
+                            )
+                        } else {
+                            let uniqueModels = Dictionary(grouping: allModels, by: \.id)
+                                .compactMap { $0.value.first }
+                                .sorted { $0.id.localizedStandardCompare($1.id) == .orderedAscending }
+                            completion(.success(uniqueModels))
+                        }
                         return
                     }
                 }
